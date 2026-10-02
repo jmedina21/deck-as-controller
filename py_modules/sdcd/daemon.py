@@ -308,6 +308,10 @@ class Daemon:
                             on_haptic=lambda cmd: _safe(deck.haptic, cmd))
             self.link = link
             self.encoder = encoder
+            try:
+                hid.keep_active(address)
+            except OSError as e:
+                log.warning("could not block sniff mode: %s", e)
             self.session_thread = threading.Thread(target=self._session, args=(link, deck, latest),
                                                    daemon=True, name="session")
             self.session_thread.start()

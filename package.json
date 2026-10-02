@@ -1,6 +1,6 @@
 {
     "name": "deck-as-controller",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Use your Steam Deck as a wireless Bluetooth controller.",
     "type": "module",
     "scripts": {

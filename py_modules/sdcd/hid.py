@@ -53,6 +53,29 @@ def connect(address: str, timeout: float = 8.0) -> tuple[socket.socket, socket.s
         raise
 
 
+# HCI: block sniff mode on the link to one host. In sniff the radio only wakes at
+# intervals, and macOS drops the link into it whenever input pauses for a moment, so
+# the next reports wait for the link to wake up.
+HCIGETCONNINFO = 0x800448D5
+HCI_COMMAND_PKT, ACL_LINK = 0x01, 0x01
+OP_WRITE_LINK_POLICY, OP_EXIT_SNIFF = 0x080D, 0x0804
+POLICY_ROLE_SWITCH_ONLY = 0x0001
+
+
+def keep_active(address: str, dev_id: int = 0):
+    """Allow only role switches on the link to `address`, and leave sniff if already in it."""
+    bdaddr = bytes.fromhex(address.replace(":", ""))[::-1]
+    with socket.socket(socket.AF_BLUETOOTH, socket.SOCK_RAW, socket.BTPROTO_HCI) as s:
+        s.bind((dev_id,))
+        req = bytearray(bdaddr + bytes([ACL_LINK]) + bytes(17))
+        fcntl.ioctl(s, HCIGETCONNINFO, req)
+        handle = struct.unpack_from("<H", req, 8)[0]
+        for op, params in ((OP_WRITE_LINK_POLICY, struct.pack("<HH", handle, POLICY_ROLE_SWITCH_ONLY)),
+                           (OP_EXIT_SNIFF, struct.pack("<H", handle))):
+            s.send(struct.pack("<BHB", HCI_COMMAND_PKT, op, len(params)) + params)
+    log.info("link to %s: sniff mode blocked", address)
+
+
 def _queued_bytes(sock: socket.socket, sndbuf: int) -> int:
     # TIOCOUTQ on Bluetooth sockets reports free send space, not queued bytes.
     free = struct.unpack("i", fcntl.ioctl(sock, termios.TIOCOUTQ, b"\0" * 4))[0]

@@ -1,6 +1,6 @@
 # Deck as Controller. (beta build)
 
-https://github.com/user-attachments/assets/c8854f73-ec46-4d12-9bf5-65d40b09f82e
+https://github.com/user-attachments/assets/07d785e7-5d3b-4eb8-ae28-92e55b4d503f
 
 A [Decky Loader](https://decky.xyz) plugin that turns your Steam Deck into a wireless Bluetooth
 controller for your Mac or iPad. Nothing needs to be installed on the other device: the Deck
@@ -8,8 +8,8 @@ pairs as a PS5, Xbox or Steam Controller.
 
 **This is still a very early build, expect latency and connection issues, specially with untested devices.**
 
-Developed on a Steam Deck OLED (SteamOS, Decky Loader 3.2) with a Mac running macOS 27 and an
-iPad Mini 7 running iOS 27. See [Tested devices](#tested-devices) for what others have tried.
+Developed on a Steam Deck OLED (Decky Loader 3.2.9 and SteamOs 3.8.28) with a Mac M4 running macOS 27.
+See [Tested devices](#tested-devices) for what others have tried.
 
 > **Independent project.** Deck as Controller is developed independently and is free. It isn't
 > affiliated with, endorsed by, or sponsored by Valve Corporation.
@@ -28,6 +28,11 @@ iPad Mini 7 running iOS 27. See [Tested devices](#tested-devices) for what other
   click them.
 - **Gyro** on the PS5 types.
 - **Battery level** of the Deck shown on the Mac (PS5 types).
+
+## Requested Features (under development/research, not all will happen)
+- USB connection
+- Use of the Steamdeck's screen as a secondary screen, (think WiiU, 3ds, guides, etc)
+- Nintendo Switch Controller Profile
 
 ## Install
 
@@ -63,7 +68,7 @@ On a Mac, **PS5 Edge** is the best all-round choice. Tested results:
 | ----------------------------------------------------------------------- | -------------- | --------------- | ---------------- |
 | Steam and games played through it (e.g. Baldur's Gate 3, Hades)         | ✅             | ✅              | ✅               |
 | Mac games that read controllers directly (e.g. Hollow Knight: Silksong) | ✅             | ❌ not detected | ❌ not detected  |
-| Rumble from Steam (Steam's test page, Steam Input games)                | ❌             | ✅              | ✅       |
+| Rumble from Steam (Steam's test page, Steam Input games)                | ❌             | ✅              | ✅               |
 | Rumble from Mac games using Apple's controller support                  | ✅             | ✅              | –                |
 | Back buttons                                                            | PS5 Edge       | Steam only      | ✅               |
 
@@ -129,9 +134,9 @@ Reports from the developer and from users. Something missing or different for yo
 
 | Deck | Connected to                 | Controller type  | Result                                                                                         | Source                                                         |
 | ---- | ---------------------------- | ---------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| OLED | Mac (macOS 27), Steam        | all four         | ✅ Works, see [Which type to pick](#which-type-to-pick)                                        | developer                                                      |
-| OLED | Mac (macOS 27), native games | PS5 / PS5 Edge   | ✅ Works                                                                                       | developer                                                      |
-| OLED | iPad Mini 7 (iOS 27)         | Xbox Elite       | ✅ Works                                                                                       | developer                                                      |
+| OLED | Mac (macOS 27), Steam        | all four         | ✅ Works, see [Which type to pick](#which-type-to-pick)                                        | [@jmedina21](https://github.com/jmedina21)                                                      |
+| OLED | Mac (macOS 27), native games | PS5 / PS5 Edge   | ✅ Works                                                                                       | [@jmedina21](https://github.com/jmedina21)                                                      |
+| OLED | iPad Mini 7 (iOS 27)         | Xbox Elite       | ✅ Works                                                                                       | [@jmedina21](https://github.com/jmedina21)                                                      |
 | –    | Steam Frame                  | all              | ✅ Works                                                                                       | [#3](https://github.com/jmedina21/deck-as-controller/issues/3) |
 | LCD  | Linux PC (NixOS)             | PS5 Edge         | ✅ Works, including trackpads and back buttons. Remove any old pairing on both sides first.    | [#4](https://github.com/jmedina21/deck-as-controller/issues/4) |
 | –    | Linux PC (CachyOS), Steam    | Steam Controller | ⚠️ Works for one user; another's pairing failed with an authentication error                    | [@SrStylus](https://github.com/SrStylus), [#2](https://github.com/jmedina21/deck-as-controller/issues/2) |

@@ -28,6 +28,7 @@ ID_CLEAR_DIGITAL_MAPPINGS = 0x81
 ID_SET_SETTINGS_VALUES = 0x87
 ID_TRIGGER_RUMBLE_CMD = 0xEB
 ID_TRIGGER_HAPTIC_PULSE = 0x8F
+ID_TRIGGER_HAPTIC_CMD = 0xEA
 SETTING_LIZARD_MODE = 9
 SETTING_IMU_MODE = 48
 SETTING_STEAM_WATCHDOG_ENABLE = 71
@@ -44,7 +45,7 @@ _L = {
     "lpad_touch": 0x80000, "rpad_touch": 0x100000,
     "l3": 0x400000, "r3": 0x4000000,
 }
-_H = {"l4": 0x200, "r4": 0x400, "qam": 0x40000}
+_H = {"l4": 0x200, "r4": 0x400, "lstick_touch": 0x4000, "rstick_touch": 0x8000, "qam": 0x40000}
 
 
 @dataclass
@@ -75,6 +76,8 @@ class DeckInput:
     rpad_click: bool = False
     lpad_touch: bool = False
     rpad_touch: bool = False
+    lstick_touch: bool = False
+    rstick_touch: bool = False
     lx: int = 0
     ly: int = 0
     rx: int = 0
@@ -85,6 +88,8 @@ class DeckInput:
     lpad_y: int = 0
     rpad_x: int = 0
     rpad_y: int = 0
+    lpad_pressure: int = 0
+    rpad_pressure: int = 0
     ax: int = 0
     ay: int = 0
     az: int = 0
@@ -102,10 +107,35 @@ class DeckInput:
         s.ax, s.ay, s.az, s.gx, s.gy, s.gz = struct.unpack_from("<6h", d, 24)
         s.lt, s.rt = struct.unpack_from("<HH", d, 44)
         s.lx, s.ly, s.rx, s.ry = struct.unpack_from("<4h", d, 48)
+        s.lpad_pressure, s.rpad_pressure = struct.unpack_from("<HH", d, 56)
         return s
 
 
 DIGITAL = [f.name for f in fields(DeckInput) if f.type is bool]
+
+HAPTIC_OFF, HAPTIC_TICK, HAPTIC_CLICK, HAPTIC_TONE = 0, 1, 2, 3
+HAPTIC_SCRIPT, HAPTIC_SWEEP = 6, 7
+
+
+def haptic_pulse_cmd(pad: int, on_us: int, off_us: int, count: int) -> bytes:
+    """Feature command: `count` pulses of `on_us` microseconds, `off_us` apart, on a trackpad.
+
+    Pads are swapped on this report for legacy reasons: 1 = left, 0 = right, 2 = both.
+    """
+    return bytes([ID_TRIGGER_HAPTIC_PULSE, 8, pad]) + struct.pack("<HHHB", on_us, off_us, count, 0)
+
+
+def haptic_cmd(pad: int, kind: int, gain_db: int = 0, freq: int = 0, duration_ms: int = 0,
+               lfo_freq: int = 0, lfo_depth: int = 0, script: int = 0,
+               sweep_start: int = 0, sweep_end: int = 0) -> bytes:
+    """Feature command for the trackpad haptics' effects (HAPTIC_*), as Steam sends on the Deck.
+
+    Here pad is 0 = left, 1 = right, 2 = both. gain_db is clamped to -24..6.
+    """
+    body = struct.pack("<BBBbHhHHBBBHH", pad, kind, 0, max(-24, min(6, gain_db)), freq,
+                       min(0x7FFF, duration_ms), 0, lfo_freq, lfo_depth, 0, script,
+                       sweep_start, sweep_end)
+    return bytes([ID_TRIGGER_HAPTIC_CMD, len(body)]) + body
 
 
 def _analog_key(s: DeckInput) -> tuple:
@@ -272,8 +302,10 @@ class DeckController:
 
     def click_pulse(self, left: bool):
         """Short haptic tick on a trackpad, like Steam gives when a pad is clicked."""
-        # Pads are swapped on this report for legacy reasons: 1 = left, 0 = right.
-        cmd = bytes([ID_TRIGGER_HAPTIC_PULSE, 8, 1 if left else 0]) + struct.pack("<HHHB", 1200, 0, 1, 0)
+        self.haptic(haptic_pulse_cmd(1 if left else 0, 1200, 0, 1))
+
+    def haptic(self, cmd: bytes):
+        """Play a trackpad haptic built by haptic_pulse_cmd() or haptic_cmd()."""
         self._feature(cmd)
 
     def _send_rumble(self, low: int, high: int):

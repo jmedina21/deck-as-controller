@@ -4,7 +4,7 @@ https://github.com/user-attachments/assets/c8854f73-ec46-4d12-9bf5-65d40b09f82e
 
 A [Decky Loader](https://decky.xyz) plugin that turns your Steam Deck into a wireless Bluetooth
 controller for your Mac or iPad. Nothing needs to be installed on the other device: the Deck
-pairs as a PS5 or Xbox controller.
+pairs as a PS5, Xbox or Steam Controller.
 
 **This is still a very early build, expect latency and connection issues, specially with untested devices.**
 
@@ -16,8 +16,9 @@ iPad Mini 7 running iOS 27.
 
 ## Features
 
-- **Three controller types:** PS5 (DualSense), PS5 Edge, and Xbox Elite Series 2. PS5 Edge
-  carries all four Deck back buttons.
+- **Four controller types:** PS5 (DualSense), PS5 Edge, Xbox Elite Series 2, and Steam
+  Controller (2026). PS5 Edge carries all four Deck back buttons; Steam Controller carries every
+  Deck control to Steam on the other device.
 - **Deck screen off while connected.** Tap **⋯** to toggle it; hold **⋯** for 2 seconds to stop
   and get the Deck's screen and controls back.
 - **Reconnects automatically** to the last device when you turn the plugin on.
@@ -67,6 +68,13 @@ On a Mac, **PS5 Edge** is the best all-round choice. Tested results:
 | Back buttons                                                            | PS5 Edge       | not tested      |
 | iPad                                                                    | not tested     | ✅              |
 
+**Steam Controller** is for playing through Steam (including Steam on a Linux or Windows PC).
+The Deck has the same controls as the 2026 Steam Controller, so Steam sees both sticks, both
+trackpads as separate pads, the four back buttons, gyro and stick touch, and you configure them
+with Steam Input like a real one. Rumble and trackpad haptics come from Steam. Games that don't
+run through Steam won't recognize it. This type is new and has only been tested with Steam on a
+Linux PC: please report how it goes elsewhere.
+
 ### Button mapping
 
 | Deck           | PS5 / PS5 Edge           | Xbox Elite              |
@@ -79,10 +87,14 @@ On a Mac, **PS5 Edge** is the best all-round choice. Tested results:
 | L5 / R5        | Edge left / right paddle | Paddles P4 / P2         |
 | ⋯              | reserved for the plugin  | reserved for the plugin |
 
+As a Steam Controller every control keeps its own name (A B X Y, View / Menu, Steam, L4 / R4,
+L5 / R5, both trackpads); only **⋯** stays reserved for the plugin.
+
 ### Options
 
 - **Turn off screen while connected**
-- **Trackpad click feedback:** the haptic tick when you click a trackpad.
+- **Trackpad click feedback:** the haptic tick when you click a trackpad. Not used as a Steam
+  Controller, where Steam plays its own trackpad haptics on the Deck.
 - **Stick deadzone**
 
 ## Known limitations
@@ -94,6 +106,10 @@ On a Mac, **PS5 Edge** is the best all-round choice. Tested results:
   (e.g. "DualSense Wireless Controller") for its Bluetooth address, even after you forget it,
   and passes that name to games. Games that recognize controllers by name, like Silksong, then
   ignore the Deck. Renaming it in Bluetooth settings doesn't help.
+- **The Steam Controller type connects over Bluetooth Classic.** A real Steam Controller uses
+  Bluetooth LE. Steam on Linux doesn't tell them apart; other systems haven't been tried. Steam
+  also registers the Deck to your account as a controller, with a serial number made up from the
+  Deck's Bluetooth address, and its grip sensors and haptic audio aren't emulated.
 - **The Deck's own Bluetooth devices are unavailable while the plugin is on.** Headphones,
   controllers and keyboards paired to the Deck can't be used, and your device never uses the
   Deck as a speaker.

@@ -15,9 +15,9 @@ log = logging.getLogger("sdcd.hid")
 PSM_CTRL, PSM_INTR = 0x11, 0x13
 SOL_BLUETOOTH, BT_SECURITY, BT_SECURITY_MEDIUM = 274, 4, 2
 
-# Reports that only carry new IMU data are rate limited so they never crowd out
-# button/stick changes, which are sent as soon as the link can take them.
-IMU_INTERVAL = 0.012
+# Reports that only carry new IMU data are rate limited (Profile.report_interval)
+# so they never crowd out button/stick changes, which are sent as soon as the
+# link can take them.
 # Reports allowed to sit unacknowledged in the socket. More than this and the
 # host sees stale input, so we wait and send the newest state instead.
 MAX_IN_FLIGHT = 2
@@ -64,12 +64,18 @@ class Link:
 
     def __init__(self, ctrl: socket.socket, intr: socket.socket, address: str, mac: bytes,
                  profile: Profile, get_report: Callable[[], bytes], has_urgent: Callable[[], bool],
-                 on_rumble: Callable[[int, int, float | None], None]):
+                 on_rumble: Callable[[int, int, float | None], None],
+                 on_haptic: Callable[[bytes], None]):
         self.ctrl, self.intr, self.address, self.mac = ctrl, intr, address, mac
         self.profile = profile
         self.get_report = get_report
         self.has_urgent = has_urgent
         self.on_rumble = on_rumble
+        self.on_haptic = on_haptic
+        try:  # send our reports ahead of other traffic on the adapter
+            intr.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)
+        except OSError:
+            pass
         self.alive = threading.Event()
         self.alive.set()  # set before any helper thread starts watching it
         self.new_input = threading.Condition()
@@ -105,11 +111,12 @@ class Link:
             sndbuf = self.intr.getsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF)
             per_report = None
             last_send = 0.0
+            interval = self.profile.report_interval
             while self.alive.is_set():
-                imu_due = time.monotonic() - last_send >= IMU_INTERVAL
+                imu_due = time.monotonic() - last_send >= interval
                 if not (imu_due or self.has_urgent()):
                     with self.new_input:
-                        self.new_input.wait(timeout=IMU_INTERVAL)
+                        self.new_input.wait(timeout=interval)
                     continue
                 queued = _queued_bytes(self.intr, sndbuf)
                 if per_report and queued >= per_report * MAX_IN_FLIGHT:
@@ -158,6 +165,9 @@ class Link:
         if kind == 0x5:  # SET_REPORT
             if param & 0x3 == 2:  # output report sent on the control channel (e.g. by Steam)
                 self._handle_output(b"\xA2" + msg[1:])
+            elif param & 0x3 == 3:  # feature report: a command for the profile, maybe haptics
+                self.profile.set_feature(msg[1:])
+                self._handle_output(b"\xA3" + msg[1:])
             return b"\x00"
         if kind == 0x6:  # GET_PROTOCOL: report protocol
             return b"\xA0\x01"
@@ -170,8 +180,12 @@ class Link:
         return b"\x03"  # ERR_UNSUPPORTED_REQUEST
 
     def _handle_output(self, msg: bytes):
-        """An output report from the host (0xA2 + report), from either channel."""
+        """An output (0xA2 + report) or feature (0xA3 + report) report from the host."""
         log.debug("output report %dB: %s", len(msg), msg[:16].hex(" "))
+        haptic = self.profile.parse_haptic(msg)
+        if haptic is not None:
+            self.on_haptic(haptic)
+            return
         rumble = self.profile.parse_rumble(msg)
         if rumble is None:
             return

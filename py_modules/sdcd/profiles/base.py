@@ -30,6 +30,11 @@ class Profile:
     service_name: str
     provider: str
     descriptor: bytes  # HID report descriptor
+    # Longest wait before sending the next report when only the IMU changed
+    # (button and stick changes always go out as soon as the link can take them).
+    report_interval: float = 0.012
+    # The host drives the trackpad haptics itself, so the Deck adds none of its own.
+    host_haptics: bool = False
 
     def new_encoder(self, deadzone: float) -> Encoder:
         raise NotImplementedError
@@ -39,11 +44,20 @@ class Profile:
         return None
 
     def parse_rumble(self, msg: bytes) -> tuple[int, int, float | None] | None:
-        """(low_freq, high_freq, duration_s) from a host output message (0xA2 ...).
+        """(low_freq, high_freq, duration_s) from a host output message (0xA2 ...,
+        or 0xA3 ... for a feature report the host wrote).
 
         Motor levels are 0..255. duration_s is how long the host asked for (the
         rumble stops by itself after it), or None to run until the host says stop.
         """
+        return None
+
+    def set_feature(self, report: bytes):
+        """The host wrote a feature report (`report` starts with the report ID)."""
+
+    def parse_haptic(self, msg: bytes) -> bytes | None:
+        """The trackpad haptic a host output message asks for, as a command for the
+        Deck's controller (see deck.haptic_pulse_cmd and deck.haptic_cmd)."""
         return None
 
     def side_reports(self, battery: Battery) -> list[bytes]:

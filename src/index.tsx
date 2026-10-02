@@ -163,7 +163,7 @@ function Content() {
         <PanelSectionRow>
           <DropdownItem
             label="Appear as"
-            description="Each type is paired separately. Back buttons need an Edge or Elite type."
+            description="Each type is paired separately. Back buttons need an Edge, Elite or Steam Controller type."
             disabled={busy}
             rgOptions={s.profiles.map((p) => ({ data: p.id, label: p.label }))}
             selectedOption={s.options.profile}

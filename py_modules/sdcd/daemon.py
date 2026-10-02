@@ -304,7 +304,8 @@ class Daemon:
             link = hid.Link(ctrl, intr, address, self.adapter.mac_bytes, self.profile,
                             get_report=lambda: encoder.encode(latest.take(), self.battery),
                             has_urgent=lambda: latest.urgent,
-                            on_rumble=lambda low, high, duration: _safe(deck.rumble, low, high, duration))
+                            on_rumble=lambda low, high, duration: _safe(deck.rumble, low, high, duration),
+                            on_haptic=lambda cmd: _safe(deck.haptic, cmd))
             self.link = link
             self.encoder = encoder
             self.session_thread = threading.Thread(target=self._session, args=(link, deck, latest),
@@ -374,7 +375,7 @@ class Daemon:
 
             # Steam normally gives a haptic tick when a trackpad is clicked; we own the pads now.
             clicked = (state.lpad_click, state.rpad_click)
-            if self.options["pad_haptics"]:
+            if self.options["pad_haptics"] and not self.profile.host_haptics:
                 for left, (was, now_down) in ((True, (pads_clicked[0], clicked[0])),
                                               (False, (pads_clicked[1], clicked[1]))):
                     if now_down and not was:

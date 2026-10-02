@@ -20,6 +20,7 @@ PROFILES = [
     {"id": "dualsense", "label": "PS5"},
     {"id": "dualsense_edge", "label": "PS5 Edge (back buttons)"},
     {"id": "xbox_elite", "label": "Xbox Elite (back buttons)"},
+    {"id": "steam_controller", "label": "Steam Controller (trackpads, back buttons)"},
 ]
 
 # Restarting bluetoothd makes WirePlumber briefly unresponsive. If Steam runs

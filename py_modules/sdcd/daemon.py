@@ -1,4 +1,5 @@
-"""Controller-mode daemon: makes the Deck a Bluetooth game controller for a paired host.
+"""Controller-mode daemon: makes the Deck a game controller for a host, over Bluetooth
+(a paired host) or a USB cable (option "connection": "usb", see usb.py).
 
 Talks to the Decky plugin over stdio using JSON lines:
   stdin  commands: {"cmd": "pair"} | {"cmd": "stop"} | {"cmd": "screen"}
@@ -8,7 +9,8 @@ Talks to the Decky plugin over stdio using JSON lines:
   stdout events:   {"type": "state", ...} | {"type": "error", "message": str}
                    {"type": "stopped", "reason": str}
 The controller type ("profile") sets the Bluetooth identity, so it's fixed for
-the daemon's lifetime; the plugin restarts the daemon to change it.
+the daemon's lifetime; the plugin restarts the daemon to change it. The same goes
+for "connection".
 """
 import json
 import logging
@@ -23,7 +25,7 @@ import dbus
 import dbus.mainloop.glib
 from gi.repository import GLib
 
-from . import bluez, hid
+from . import bluez, hid, usb
 from .deck import DeckController, DeckInput, SharedInput, rebind_all
 from .profiles import DEFAULT_PROFILE, PROFILES, Battery, Encoder, get_profile
 
@@ -34,7 +36,9 @@ RECONNECT_INTERVAL = 5.0
 QAM_TAP_MAX = 0.6  # seconds: tap ⋯ toggles the screen
 QAM_HOLD_STOP = 2.0  # seconds: hold ⋯ stops controller mode
 BATTERY = "/sys/class/power_supply/BAT1"
+BT_ADDRESS = "/sys/class/bluetooth/hci0/address"
 RUNTIME_OPTIONS = ("screen_off", "deadzone", "pad_haptics")
+USB_POLL = 0.5  # seconds between checks for a computer on the USB cable
 
 
 class Hosts:
@@ -79,16 +83,30 @@ def read_battery() -> Battery:
     return Battery(percent=percent, charging=status in ("Charging", "Full"))
 
 
+def bt_address_bytes() -> bytes:
+    """The Deck's Bluetooth address (a stable serial number in wired mode too)."""
+    try:
+        with open(BT_ADDRESS) as f:
+            return bytes.fromhex(f.read().strip().replace(":", ""))
+    except (OSError, ValueError):
+        return bytes(6)
+
+
 class Daemon:
     def __init__(self, settings_dir: str, options: dict):
         self.options = {"screen_off": True, "deadzone": 0.08, "pad_haptics": True,
-                        "profile": DEFAULT_PROFILE, **options}
+                        "profile": DEFAULT_PROFILE, "connection": "bluetooth", **options}
+        self.usb = self.options["connection"] == "usb"
         self.profile = get_profile(self.options["profile"])
+        if self.usb and not self.profile.usb_descriptor:
+            log.warning("%s has no wired mode; using %s", self.profile.id, DEFAULT_PROFILE)
+            self.profile = get_profile(DEFAULT_PROFILE)
+        self.usb_fd: int | None = None
         self.hosts = Hosts(settings_dir)
         self.loop = GLib.MainLoop()
         self.out_lock = threading.Lock()
         self.link_lock = threading.Lock()
-        self.link: hid.Link | None = None
+        self.link: hid.Link | usb.Link | None = None
         self.encoder: Encoder | None = None
         self.session_thread: threading.Thread | None = None
         self.link_name = ""
@@ -118,6 +136,8 @@ class Daemon:
     def emit_state(self):
         if self.link:
             state = "connected"
+        elif self.usb:
+            state = "waiting"  # for a computer on the USB cable
         elif self.adapter and self.adapter.pairing_open():
             state = "pairing"
         elif self.auto_reconnect and self.target:
@@ -126,7 +146,8 @@ class Daemon:
             state = "idle"
         event = dict(type="state", state=state, host=self.link_name, target=self.target,
                      hosts=self.hosts.items, screen_off=self.screen_off, options=self.options,
-                     profiles=[{"id": p.id, "label": p.label} for p in PROFILES.values()])
+                     profiles=[{"id": p.id, "label": p.label, "usb": bool(p.usb_descriptor)}
+                               for p in PROFILES.values()])
         if event != self.last_state:
             self.last_state = json.loads(json.dumps(event))  # deep copy
             self.emit(**event)
@@ -140,6 +161,8 @@ class Daemon:
             cmd = msg.get("cmd")
             if cmd == "stop":
                 self.stop("stopped")
+            elif cmd in ("pair", "connect", "forget") and self.usb:
+                continue  # Bluetooth only
             elif cmd == "pair":
                 GLib.idle_add(self._open_pairing)
             elif cmd == "connect":
@@ -192,11 +215,16 @@ class Daemon:
         self.emit(type="state", state="starting", host="", target=None, hosts=self.hosts.items,
                   screen_off=False, options=self.options)
         try:
-            bluez.enter_gamepad_mode(self.profile)
-            self.adapter = bluez.Adapter(dbus.SystemBus(), self.profile)
-            if not self.target:
-                self.adapter.open_pairing(PAIRING_SECONDS)
-            for target in (self._stdin_loop, self._listen_loop, self._reconnect_loop):
+            if self.usb:
+                loops = (self._stdin_loop, self._usb_loop)
+                self._start_usb()
+            else:
+                loops = (self._stdin_loop, self._listen_loop, self._reconnect_loop)
+                bluez.enter_gamepad_mode(self.profile)
+                self.adapter = bluez.Adapter(dbus.SystemBus(), self.profile)
+                if not self.target:
+                    self.adapter.open_pairing(PAIRING_SECONDS)
+            for target in loops:
                 threading.Thread(target=target, daemon=True, name=target.__name__).start()
             GLib.timeout_add_seconds(2, self._tick)
             self.emit_state()
@@ -228,6 +256,14 @@ class Daemon:
         if self.session_thread:
             self.session_thread.join(timeout=3)
         rebind_all()
+        if self.usb:
+            if self.usb_fd is not None:
+                os.close(self.usb_fd)
+            try:
+                usb.remove_gadget()
+            except OSError:
+                log.exception("removing the USB gadget failed")
+            return
         try:
             bluez.restore_stock()
         except Exception:
@@ -292,6 +328,40 @@ class Daemon:
                 continue
             self._start_session(ctrl, intr, address)
 
+    def _start_usb(self):
+        if not usb.udc_name():
+            raise RuntimeError("USB mode is off. Turn it on in the plugin (the Deck restarts), "
+                               "or set USB Dual Role Device to DRD in the BIOS.")
+        usb.create_gadget(self.profile)
+        for _ in range(50):  # /dev/hidg0 appears once udev has seen the gadget
+            if os.path.exists(usb.HIDG):
+                break
+            time.sleep(0.1)
+        self.usb_fd = usb.open_hidg(self.profile, bt_address_bytes())
+
+    def _usb_loop(self):
+        """Wired mode: start a session whenever a computer has set up the controller."""
+        while not self.stopping.is_set():
+            if not self.link and usb.host_connected():
+                self._start_usb_session()
+            self.stopping.wait(USB_POLL)
+
+    def _start_usb_session(self):
+        with self.link_lock:
+            if self.link or self.stopping.is_set():
+                return
+            deck = DeckController()
+            encoder = self.profile.new_encoder(self.options["deadzone"])
+            latest = SharedInput()
+            link = usb.Link(self.usb_fd, self.profile,
+                            get_report=lambda: encoder.encode(latest.take(), self.battery),
+                            on_rumble=lambda low, high, duration: _safe(deck.rumble, low, high, duration))
+            self.link = link
+            self.encoder = encoder
+            self.session_thread = threading.Thread(target=self._session, args=(link, deck, latest),
+                                                   daemon=True, name="session")
+            self.session_thread.start()
+
     def _start_session(self, ctrl, intr, address: str):
         with self.link_lock:
             if self.link or self.stopping.is_set():
@@ -316,13 +386,16 @@ class Daemon:
                                                    daemon=True, name="session")
             self.session_thread.start()
 
-    def _session(self, link: hid.Link, deck: DeckController, latest: SharedInput):
-        name = self.adapter.device_name(link.address)
+    def _session(self, link: hid.Link | usb.Link, deck: DeckController, latest: SharedInput):
+        if self.usb:
+            name = "your computer (USB)"
+        else:
+            name = self.adapter.device_name(link.address)
+            self.hosts.remember(link.address, name, self.profile.id)
+            self.target = link.address
+            self.auto_reconnect = True
+            GLib.idle_add(self.adapter.close_pairing)
         self.link_name = name
-        self.hosts.remember(link.address, name, self.profile.id)
-        self.target = link.address
-        self.auto_reconnect = True
-        GLib.idle_add(self.adapter.close_pairing)
         log.info("connected to %s (%s) as %s", name, link.address, self.profile.id)
         try:
             deck.grab()
@@ -356,7 +429,7 @@ class Daemon:
                 self.auto_reconnect = False
             self.emit_state()
 
-    def _read_deck(self, link: hid.Link, deck: DeckController, latest: SharedInput):
+    def _read_deck(self, link: hid.Link | usb.Link, deck: DeckController, latest: SharedInput):
         qam_down_at = None
         last_config = time.monotonic()
         pads_clicked = (False, False)

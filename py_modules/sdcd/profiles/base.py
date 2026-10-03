@@ -35,6 +35,9 @@ class Profile:
     report_interval: float = 0.012
     # The host drives the trackpad haptics itself, so the Deck adds none of its own.
     host_haptics: bool = False
+    # Wired (USB gadget) support: the controller's USB HID descriptor, or empty if
+    # this type only works over Bluetooth.
+    usb_descriptor: bytes = b""
 
     def new_encoder(self, deadzone: float) -> Encoder:
         raise NotImplementedError
@@ -63,6 +66,14 @@ class Profile:
     def side_reports(self, battery: Battery) -> list[bytes]:
         """Extra input reports (without the 0xA1 header) to send every few seconds."""
         return []
+
+    def usb_report(self, report: bytes) -> bytes:
+        """The USB input report for an encoded (Bluetooth) input report."""
+        raise NotImplementedError
+
+    def parse_usb_rumble(self, msg: bytes) -> tuple[int, int, float | None] | None:
+        """Like parse_rumble, for an output report received over USB (starts with the report ID)."""
+        return None
 
     def sdp_record(self) -> str:
         return f"""<?xml version="1.0" encoding="UTF-8" ?>

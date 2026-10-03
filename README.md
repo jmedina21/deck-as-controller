@@ -2,9 +2,9 @@
 
 https://github.com/user-attachments/assets/07d785e7-5d3b-4eb8-ae28-92e55b4d503f
 
-A [Decky Loader](https://decky.xyz) plugin that turns your Steam Deck into a wireless Bluetooth
-controller for your Mac or iPad. Nothing needs to be installed on the other device: the Deck
-pairs as a PS5, Xbox or Steam Controller.
+A [Decky Loader](https://decky.xyz) plugin that turns your Steam Deck into a controller for your
+Mac, iPad or PC, wirelessly over Bluetooth or wired over a USB cable. Nothing needs to be
+installed on the other device: the Deck shows up as a PS5, Xbox or Steam Controller.
 
 **This is still a very early build, expect latency and connection issues, specially with untested devices.**
 
@@ -19,6 +19,8 @@ See [Tested devices](#tested-devices) for what others have tried.
 - **Four controller types:** PS5 (DualSense), PS5 Edge, Xbox Elite Series 2, and Steam
   Controller (2026). PS5 Edge carries all four Deck back buttons; Steam Controller carries every
   Deck control to Steam on the other device.
+- **Wired mode (USB cable)** as a PS5 or PS5 Edge controller, with much lower latency than
+  Bluetooth. See [Wired (USB)](#wired-usb).
 - **Deck screen off while connected.** Tap **⋯** to toggle it; hold **⋯** for 2 seconds to stop
   and get the Deck's screen and controls back.
 - **Reconnects automatically** to the last device when you turn the plugin on.
@@ -30,7 +32,6 @@ See [Tested devices](#tested-devices) for what others have tried.
 - **Battery level** of the Deck shown on the Mac (PS5 types).
 
 ## Requested Features (under development/research, not all will happen)
-- USB connection
 - Use of the Steamdeck's screen as a secondary screen, (think WiiU, 3ds, guides, etc)
 - Nintendo Switch Controller Profile
 
@@ -44,7 +45,8 @@ See [Tested devices](#tested-devices) for what others have tried.
 ## Use
 
 1. Open **⋯ → Decky → Deck as Controller**, choose a **controller type**, and turn on
-   **Use as controller**.
+   **Use as controller**. **Connect with** is **Wireless (Bluetooth)** by default; for a cable,
+   see [Wired (USB)](#wired-usb).
 2. The first time, the Deck is ready to pair. On your Mac or iPad, open Bluetooth settings and
    connect to the controller that appears (e.g. "DualSense Edge Wireless Controller").
 3. After that, turning the plugin on reconnects to the device automatically.
@@ -59,6 +61,27 @@ While connected, the Deck's controls go to your device:
 **Switching controller types:** your device remembers the Deck as the type it was paired as.
 To switch, remove the Deck from your device's Bluetooth settings, choose the new type, tap
 **Pair a new device**, and pair again.
+
+### Wired (USB)
+
+Over a USB-C cable the Deck is a wired PS5 or PS5 Edge controller: no pairing, and input
+arrives much more steadily. On a Mac, the longest gap between updates was 14 ms over USB,
+against 80-140 ms over Bluetooth, and tested games felt lag-free.
+
+1. Set **Connect with** to **Wired (USB cable)**.
+2. The first time, tap **Turn on USB mode** and confirm. The Deck restarts. USB mode lets the
+   Deck's USB-C port act as a device; it's the BIOS option *USB Dual Role Device*.
+3. Turn on **Use as controller** and connect the Deck to your computer with a USB-C cable. It
+   connects within a second, and again whenever you replug the cable.
+
+While USB mode is on, USB drives, hubs and docks plugged into the Deck may not work, the Deck
+can't boot from USB, Windows installed on the Deck loses USB, and the Deck charges slowly from a
+computer. To go back, tap **Turn off USB mode** in the wired view (the Deck restarts again).
+
+Switching USB mode from the plugin works on the Deck OLED with BIOS F7G0114. On other BIOS
+versions the plugin shows how to turn it on in the BIOS instead: with the Deck off, hold
+**Volume +** and press **Power**, open **Setup Utility**, then **Advanced → USB Configuration →
+USB Dual Role Device → DRD**.
 
 ### Which type to pick
 
@@ -121,11 +144,17 @@ L5 / R5, both trackpads); only **⋯** stays reserved for the plugin.
   Bluetooth LE. Steam on Linux doesn't tell them apart; other systems haven't been tried. Steam
   also registers the Deck to your account as a controller, with a serial number made up from the
   Deck's Bluetooth address, and its grip sensors and haptic audio aren't emulated.
-- **The Deck's own Bluetooth devices are unavailable while the plugin is on.** Headphones,
-  controllers and keyboards paired to the Deck can't be used, and your device never uses the
-  Deck as a speaker.
-- **Turning the plugin on or off restarts the Deck's Bluetooth**, which drops any Bluetooth
-  devices connected to the Deck for a moment.
+- **The Deck's own Bluetooth devices are unavailable while the plugin is on wirelessly.**
+  Headphones, controllers and keyboards paired to the Deck can't be used, and your device never
+  uses the Deck as a speaker. Wired mode leaves the Deck's Bluetooth alone.
+- **Turning the plugin on or off wirelessly restarts the Deck's Bluetooth**, which drops any
+  Bluetooth devices connected to the Deck for a moment.
+- **Wired mode is PS5 and PS5 Edge only.** The Xbox Elite and Steam Controller types work over
+  Bluetooth only.
+- **USB mode can only be switched from the plugin on known BIOS versions** (Deck OLED 512Gb, F7G0114
+  so far), because the setting's location in the firmware differs between versions. The BIOS
+  setup screen keeps showing XHCI while the plugin has USB mode on; saving settings there turns
+  USB mode off again.
 
 ## Tested devices
 
@@ -137,6 +166,7 @@ Reports from the developer and from users. Something missing or different for yo
 | OLED | Mac (macOS 27), Steam        | all four         | ✅ Works, see [Which type to pick](#which-type-to-pick)                                        | [@jmedina21](https://github.com/jmedina21)                                                      |
 | OLED | Mac (macOS 27), native games | PS5 / PS5 Edge   | ✅ Works                                                                                       | [@jmedina21](https://github.com/jmedina21)                                                      |
 | OLED | iPad Mini 7 (iOS 27)         | Xbox Elite       | ✅ Works                                                                                       | [@jmedina21](https://github.com/jmedina21)                                                      |
+| OLED | Mac (macOS 27), USB cable    | PS5 / PS5 Edge   | ✅ Works in Steam and native games, including back buttons, rumble and replugging              | [@jmedina21](https://github.com/jmedina21)                                                      |
 | –    | Steam Frame                  | all              | ✅ Works                                                                                       | [#3](https://github.com/jmedina21/deck-as-controller/issues/3) |
 | LCD  | Linux PC (NixOS)             | PS5 Edge         | ✅ Works, including trackpads and back buttons. Remove any old pairing on both sides first.    | [#4](https://github.com/jmedina21/deck-as-controller/issues/4) |
 | –    | Linux PC (CachyOS), Steam    | Steam Controller | ⚠️ Works for one user; another's pairing failed with an authentication error                    | [@SrStylus](https://github.com/SrStylus), [#2](https://github.com/jmedina21/deck-as-controller/issues/2) |
@@ -148,6 +178,10 @@ The plugin's backend runs a small daemon with the Deck's system Python:
 - **Bluetooth:** restarts BlueZ with a runtime-only config (under `/run`) that frees the HID
   channels and gives the Deck a gamepad identity, then serves the Bluetooth HID profile itself.
   Stopping the plugin, or rebooting, restores the stock setup.
+- **USB:** in wired mode the Deck's USB-C port acts as a USB device (Linux USB gadget) that
+  presents a DualSense's own USB descriptor. USB mode is turned on by changing the firmware's copy
+  of the *USB Dual Role Device* setting (one byte in the `AmdSetup` UEFI variable), which takes
+  effect at the next boot. The original variable is backed up first.
 - **Input:** takes exclusive access to the built-in controller over USB, so Steam on the Deck
   stops reacting to it, and translates its reports into the chosen controller's format.
 - **Profiles:** `py_modules/sdcd/profiles/` defines each controller type: its Bluetooth
@@ -163,6 +197,30 @@ scripts/package.sh                 # build out/deck-as-controller.zip
 
 To log what the host sends (rumble, setup requests), run `sudo touch /run/sdcd-debug` on the
 Deck before turning the plugin on; the output appears in Decky's plugin log.
+
+### Mapping USB mode on another BIOS
+
+The plugin switches USB mode by changing one byte in the `AmdSetup` UEFI variable, and that
+byte's position can differ between BIOS versions. To find it on yours (Desktop Mode, Konsole):
+
+1. Note the version: `cat /sys/class/dmi/id/bios_version`.
+2. In the BIOS, set **USB Dual Role Device** to **XHCI**, boot, and save a copy:
+   `sudo cp /sys/firmware/efi/efivars/AmdSetup-3a997502-647a-4c82-998e-52ef9486a247 ~/amdsetup-xhci`
+3. Set it to **DRD**, boot, check that `ls /sys/class/udc` shows `dwc3.1.auto`, and save another
+   copy as `~/amdsetup-drd`.
+4. Compare them: `cmp -l ~/amdsetup-xhci ~/amdsetup-drd`. It should print a single line such as
+   `229 0 1`. The offset is that first number minus 5 (`cmp` counts from 1, and the file starts
+   with 4 attribute bytes), so `229` means `224`. Also note the file size (`ls -l`).
+5. Add `"<version>": <offset>` to `DRD_OFFSETS` in `py_modules/sdcd/usb.py`, or open an issue
+   with the version, the `cmp` output and the file size. If the size isn't 1474 bytes, mention
+   it: the plugin checks the size before writing.
+
+Only map a version when exactly one byte differs. The menu itself is the `Setup` variable, which
+the firmware doesn't let the OS write, so its offset alone isn't enough. You can still use it to
+cross-check: the firmware images in `/usr/share/jupiter_bios/` contain the BIOS menus, and
+running [UEFIExtract](https://github.com/LongSoft/UEFITool) and
+[IFRExtractor-RS](https://github.com/LongSoft/IFRExtractor-RS) on the `SetupUtility` module
+shows "USB Dual Role Device" and its `Setup` offset (`0x227` on F7G0114).
 
 ## Contributing
 
@@ -191,4 +249,6 @@ Mac and iPad are trademarks of Apple. These names are used only to describe comp
 project isn't affiliated with or endorsed by any of these companies.
 
 The plugin changes the Deck's Bluetooth setup and takes over its built-in controller while it
-runs. Both are restored when you turn it off or reboot. Use it at your own risk.
+runs. Both are restored when you turn it off or reboot. Turning on USB mode changes a firmware
+setting, which stays until you turn it off in the plugin or change it in the BIOS. Use it at your
+own risk.

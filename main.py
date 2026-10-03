@@ -12,16 +12,19 @@ import signal
 import decky
 
 SYSTEM_PYTHON = "/usr/bin/python3"
-DEFAULT_OPTIONS = {"screen_off": True, "deadzone": 0.08, "pad_haptics": True, "profile": "dualsense_edge"}
-# Options that change the daemon's Bluetooth identity; changing them restarts it.
-RESTART_OPTIONS = ("profile",)
+DEFAULT_OPTIONS = {"screen_off": True, "deadzone": 0.02, "pad_haptics": True, "profile": "dualsense_edge",
+                   "connection": "bluetooth"}
+# Options that change the daemon's identity or transport; changing them restarts it.
+RESTART_OPTIONS = ("profile", "connection")
 # Must match py_modules/sdcd/profiles (the daemon also reports these once running).
+# usb: the type also works over a USB cable.
 PROFILES = [
-    {"id": "dualsense", "label": "PS5"},
-    {"id": "dualsense_edge", "label": "PS5 Edge (back buttons)"},
-    {"id": "xbox_elite", "label": "Xbox Elite (back buttons)"},
-    {"id": "steam_controller", "label": "Steam Controller (trackpads, back buttons)"},
+    {"id": "dualsense", "label": "PS5", "usb": True},
+    {"id": "dualsense_edge", "label": "PS5 Edge (back buttons)", "usb": True},
+    {"id": "xbox_elite", "label": "Xbox Elite (back buttons)", "usb": False},
+    {"id": "steam_controller", "label": "Steam Controller (trackpads, back buttons)", "usb": False},
 ]
+USB_PROFILES = [p["id"] for p in PROFILES if p["usb"]]
 
 # Restarting bluetoothd makes WirePlumber briefly unresponsive. If Steam runs
 # `wpctl` in that window, the query can hang forever and freeze Steam's UI
@@ -82,6 +85,15 @@ class Plugin:
     # ---- frontend API -----------------------------------------------------
 
     async def get_state(self) -> dict:
+        self.state = {**self.state, "usb": await self._drd("status")}
+        return self.state
+
+    async def set_usb_mode(self, enabled: bool) -> dict:
+        """Turn USB mode (BIOS USB Dual Role Device) on or off for the next boot."""
+        status = await self._drd("on" if enabled else "off")
+        if status.get("error"):
+            await decky.emit("error", status["error"])
+        await self._publish({**self.state, "usb": status})
         return self.state
 
     async def set_enabled(self, enabled: bool) -> dict:
@@ -127,6 +139,8 @@ class Plugin:
         if key not in DEFAULT_OPTIONS or self.options.get(key) == value:
             return self.state
         self.options[key] = value
+        if self.options["connection"] == "usb" and self.options["profile"] not in USB_PROFILES:
+            self.options["profile"] = DEFAULT_OPTIONS["profile"]  # only the PS5 types work over USB
         self._save_options()
         self.state = {**self.state, "options": self.options}
         if key in RESTART_OPTIONS:
@@ -189,6 +203,7 @@ class Plugin:
         await proc.wait()
         await self._restore()
         await self._publish({**self._idle_state(), "hosts": self.state.get("hosts", []),
+                             "usb": self.state.get("usb"),
                              "error": error or (f"daemon exited with code {proc.returncode}"
                                                 if proc.returncode else None)})
 
@@ -206,6 +221,19 @@ class Plugin:
             decky.logger.error("restore failed: %s", out.decode(errors="replace"))
         asyncio.get_event_loop().create_task(self._guard_steam())
 
+    async def _drd(self, action: str) -> dict:
+        """USB mode status, or switch it ("on"/"off"); see sdcd.usb."""
+        proc = await asyncio.create_subprocess_exec(
+            SYSTEM_PYTHON, "-m", "sdcd", "--drd", action,
+            "--settings-dir", decky.DECKY_PLUGIN_SETTINGS_DIR,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_daemon_env())
+        out, err = await proc.communicate()
+        try:
+            return json.loads(out)
+        except ValueError:
+            decky.logger.error("USB mode %s failed: %s", action, err.decode(errors="replace"))
+            return {"bios": "", "active": False, "configured": None, "error": "couldn't read USB mode"}
+
     async def _publish(self, state: dict):
         self.state = state
         await decky.emit("state", state)
@@ -215,7 +243,7 @@ class Plugin:
     def _idle_state(self) -> dict:
         return {"running": False, "state": "off", "host": "", "target": None,
                 "hosts": self._load_hosts(), "screen_off": False, "options": self.options,
-                "profiles": PROFILES, "error": None}
+                "profiles": PROFILES, "usb": None, "error": None}
 
     def _load_hosts(self) -> list:
         try:

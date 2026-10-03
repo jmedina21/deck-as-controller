@@ -16,7 +16,7 @@ import time
 
 from ..deck import (HAPTIC_SCRIPT, HAPTIC_SWEEP, HAPTIC_TONE, DeckInput, haptic_cmd,
                     haptic_pulse_cmd)
-from .base import Battery, Encoder, Profile, radial_deadzone
+from .base import Battery, Encoder, Profile, stick_unit
 
 REPORT_STATE = 0x45  # 45 bytes after the ID: state without the orientation quaternion
 REPORT_BATTERY = 0x43
@@ -88,14 +88,13 @@ DESCRIPTOR = (
 )
 
 
-def _stick(x: int, y: int, deadzone: float) -> tuple[int, int]:
-    fx, fy = radial_deadzone(x, y, deadzone)
+def _stick(x: int, y: int) -> tuple[int, int]:
+    fx, fy = stick_unit(x, y)
     return round(fx * 32767), round(fy * 32767)
 
 
 class SteamEncoder(Encoder):
-    def __init__(self, deadzone: float):
-        self.deadzone = deadzone
+    def __init__(self):
         self.counter = 0
 
     def encode(self, d: DeckInput | None, battery: Battery) -> bytes:
@@ -113,7 +112,7 @@ class SteamEncoder(Encoder):
                 buttons |= mask
         # Sticks, pads and IMU use the Deck's own units and axes.
         struct.pack_into("<IhhhhhhhhHhhH", r, 2, buttons, min(32767, d.lt), min(32767, d.rt),
-                         *_stick(d.lx, d.ly, self.deadzone), *_stick(d.rx, d.ry, self.deadzone),
+                         *_stick(d.lx, d.ly), *_stick(d.rx, d.ry),
                          d.lpad_x, d.lpad_y, d.lpad_pressure,
                          d.rpad_x, d.rpad_y, d.rpad_pressure)
         struct.pack_into("<6h", r, 34, d.ax, d.ay, d.az, d.gx, d.gy, d.gz)
@@ -138,8 +137,8 @@ class SteamController(Profile):
         self.command = bytes(2)  # last feature command from the host, without the report ID
         self.settings: dict[int, int] = {}
 
-    def new_encoder(self, deadzone: float) -> Encoder:
-        return SteamEncoder(deadzone)
+    def new_encoder(self) -> Encoder:
+        return SteamEncoder()
 
     def set_feature(self, report: bytes):
         if len(report) < 3 or report[0] != REPORT_FEATURE:

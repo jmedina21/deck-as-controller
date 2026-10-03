@@ -1,5 +1,4 @@
 """What every emulated controller type provides."""
-import math
 from dataclasses import dataclass
 
 from ..deck import DeckInput
@@ -39,7 +38,7 @@ class Profile:
     # this type only works over Bluetooth.
     usb_descriptor: bytes = b""
 
-    def new_encoder(self, deadzone: float) -> Encoder:
+    def new_encoder(self) -> Encoder:
         raise NotImplementedError
 
     def feature_report(self, report_id: int, mac: bytes) -> bytes | None:
@@ -116,14 +115,9 @@ class Profile:
 """
 
 
-def radial_deadzone(x: int, y: int, deadzone: float) -> tuple[float, float]:
-    """Deck stick int16 values -> (-1..1, -1..1) with a radial deadzone, +y up."""
-    fx, fy = max(-1.0, x / 32767.0), max(-1.0, y / 32767.0)
-    mag = math.hypot(fx, fy)
-    if mag <= deadzone:
-        return 0.0, 0.0
-    scale = min(1.0, (mag - deadzone) / (1.0 - deadzone)) / mag
-    return fx * scale, fy * scale
+def stick_unit(x: int, y: int) -> tuple[float, float]:
+    """Deck stick int16 values -> (-1..1, -1..1), +y up. No deadzone: the host applies its own."""
+    return max(-1.0, x / 32767.0), max(-1.0, y / 32767.0)
 
 
 _HAT8 = {

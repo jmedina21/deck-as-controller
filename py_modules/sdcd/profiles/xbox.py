@@ -6,7 +6,7 @@ report with paddles, as sent by Elite Series 2 firmware 5.13+).
 import struct
 
 from ..deck import DeckInput
-from .base import Battery, Encoder, Profile, hat_direction, radial_deadzone
+from .base import Battery, Encoder, Profile, hat_direction, stick_unit
 
 # Input report 0x01 (19 bytes after the ID):
 #   LX LY RX RY (u16) | LT RT (10 bit in u16) | hat (1..8, 0 = centered) |
@@ -51,17 +51,14 @@ def _axis(v: float) -> int:
 
 
 class XboxEncoder(Encoder):
-    def __init__(self, deadzone: float):
-        self.deadzone = deadzone
-
     def encode(self, d: DeckInput | None, battery: Battery) -> bytes:
         r = bytearray(20)
         r[0] = 0x01
         if d is None:
             struct.pack_into("<4H", r, 1, 0x8000, 0x8000, 0x8000, 0x8000)
             return bytes(r)
-        lx, ly = radial_deadzone(d.lx, d.ly, self.deadzone)
-        rx, ry = radial_deadzone(d.rx, d.ry, self.deadzone)
+        lx, ly = stick_unit(d.lx, d.ly)
+        rx, ry = stick_unit(d.rx, d.ry)
         struct.pack_into("<4H", r, 1, _axis(lx), _axis(-ly), _axis(rx), _axis(-ry))  # +y down
         struct.pack_into("<2H", r, 9, d.lt >> 5, d.rt >> 5)  # 15 bit -> 10 bit
         hat = hat_direction(d)
@@ -88,8 +85,8 @@ class Xbox(Profile):
     provider = "Microsoft"
     descriptor = DESCRIPTOR
 
-    def new_encoder(self, deadzone: float) -> Encoder:
-        return XboxEncoder(deadzone)
+    def new_encoder(self) -> Encoder:
+        return XboxEncoder()
 
     def parse_rumble(self, msg: bytes) -> tuple[int, int, float | None] | None:
         # a2 03 <enable> <lt> <rt> <strong> <weak> <duration> <delay> <loop>

@@ -5,7 +5,7 @@ Talks to the Decky plugin over stdio using JSON lines:
   stdin  commands: {"cmd": "pair"} | {"cmd": "stop"} | {"cmd": "screen"}
                    {"cmd": "connect", "address": str (optional)}
                    {"cmd": "forget", "address": str}
-                   {"cmd": "options", "screen_off": bool, "deadzone": float, "pad_haptics": bool}
+                   {"cmd": "options", "screen_off": bool, "pad_haptics": bool}
   stdout events:   {"type": "state", ...} | {"type": "error", "message": str}
                    {"type": "stopped", "reason": str}
 The controller type ("profile") sets the Bluetooth identity, so it's fixed for
@@ -37,7 +37,7 @@ QAM_TAP_MAX = 0.6  # seconds: tap ⋯ toggles the screen
 QAM_HOLD_STOP = 2.0  # seconds: hold ⋯ stops controller mode
 BATTERY = "/sys/class/power_supply/BAT1"
 BT_ADDRESS = "/sys/class/bluetooth/hci0/address"
-RUNTIME_OPTIONS = ("screen_off", "deadzone", "pad_haptics")
+RUNTIME_OPTIONS = ("screen_off", "pad_haptics")
 USB_POLL = 0.5  # seconds between checks for a computer on the USB cable
 
 
@@ -94,7 +94,7 @@ def bt_address_bytes() -> bytes:
 
 class Daemon:
     def __init__(self, settings_dir: str, options: dict):
-        self.options = {"screen_off": True, "deadzone": 0.08, "pad_haptics": True,
+        self.options = {"screen_off": True, "pad_haptics": True,
                         "profile": DEFAULT_PROFILE, "connection": "bluetooth", **options}
         self.usb = self.options["connection"] == "usb"
         self.profile = get_profile(self.options["profile"])
@@ -173,8 +173,6 @@ class Daemon:
                 self.toggle_screen()
             elif cmd == "options":
                 self.options.update({k: v for k, v in msg.items() if k in RUNTIME_OPTIONS})
-                if self.encoder:
-                    self.encoder.deadzone = self.options["deadzone"]
                 self.emit_state()
         self.stop("plugin went away")
 
@@ -351,7 +349,7 @@ class Daemon:
             if self.link or self.stopping.is_set():
                 return
             deck = DeckController()
-            encoder = self.profile.new_encoder(self.options["deadzone"])
+            encoder = self.profile.new_encoder()
             latest = SharedInput()
             link = usb.Link(self.usb_fd, self.profile,
                             get_report=lambda: encoder.encode(latest.take(), self.battery),
@@ -369,7 +367,7 @@ class Daemon:
                 intr.close()
                 return
             deck = DeckController()
-            encoder = self.profile.new_encoder(self.options["deadzone"])
+            encoder = self.profile.new_encoder()
             latest = SharedInput()
             link = hid.Link(ctrl, intr, address, self.adapter.mac_bytes, self.profile,
                             get_report=lambda: encoder.encode(latest.take(), self.battery),

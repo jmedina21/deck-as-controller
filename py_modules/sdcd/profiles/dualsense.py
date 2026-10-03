@@ -4,7 +4,7 @@ import time
 import zlib
 
 from ..deck import DeckInput
-from .base import Battery, Encoder, Profile, hat_direction, radial_deadzone
+from .base import Battery, Encoder, Profile, hat_direction, stick_unit
 
 INPUT_REPORT_LEN = 78  # report 0x31 including report ID and CRC
 TOUCH_W, TOUCH_H = 1920, 1080
@@ -69,9 +69,9 @@ def _with_crc(seed: int, report: bytearray) -> bytes:
     return bytes(report)
 
 
-def _stick(x: int, y: int, deadzone: float) -> tuple[int, int]:
+def _stick(x: int, y: int) -> tuple[int, int]:
     """Deck stick -> DualSense bytes (0..255, +y down)."""
-    fx, fy = radial_deadzone(x, y, deadzone)
+    fx, fy = stick_unit(x, y)
     return (max(0, min(255, round(128 + fx * 127.5))),
             max(0, min(255, round(128 - fy * 127.5))))
 
@@ -88,8 +88,7 @@ def _touch(touching: bool, touch_id: int, x: int, y: int, left_half: bool) -> by
 
 
 class DualSenseEncoder(Encoder):
-    def __init__(self, deadzone: float, edge: bool):
-        self.deadzone = deadzone
+    def __init__(self, edge: bool):
         self.edge = edge
         self.counter = 0
         self.touch_ids = [0, 1]  # incremented on each new contact
@@ -116,8 +115,8 @@ class DualSenseEncoder(Encoder):
         return _with_crc(0xA1, r)
 
     def _fill(self, st: memoryview, d: DeckInput):
-        st[0], st[1] = _stick(d.lx, d.ly, self.deadzone)
-        st[2], st[3] = _stick(d.rx, d.ry, self.deadzone)
+        st[0], st[1] = _stick(d.lx, d.ly)
+        st[2], st[3] = _stick(d.rx, d.ry)
         st[4], st[5] = min(255, d.lt >> 7), min(255, d.rt >> 7)
 
         hat = hat_direction(d)
@@ -163,8 +162,8 @@ class DualSense(Profile):
         if edge:
             self.bt_name = "DualSense Edge Wireless Controller"
 
-    def new_encoder(self, deadzone: float) -> Encoder:
-        return DualSenseEncoder(deadzone, self.edge)
+    def new_encoder(self) -> Encoder:
+        return DualSenseEncoder(self.edge)
 
     def feature_report(self, report_id: int, mac: bytes) -> bytes | None:
         if report_id == 0x05:

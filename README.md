@@ -55,7 +55,7 @@ While connected, the Deck's controls go to your device:
 
 | On the Deck                         | Does                                     |
 | ----------------------------------- | ---------------------------------------- |
-| Tap **⋯** (or tap the black screen) | Turn the Deck screen on or off           |
+| Tap **⋯** (or the screen)           | Turn the Deck screen on or off           |
 | Hold **⋯** for 2 seconds            | Stop and give the Deck its controls back |
 
 **Switching controller types:** your device remembers the Deck as the type it was paired as.
@@ -122,9 +122,8 @@ L5 / R5, both trackpads); only **⋯** stays reserved for the plugin.
 ### Options
 
 - **Turn off screen while connected**
-- **Trackpad click feedback:** the haptic tick when you click a trackpad. Not used as a Steam
-  Controller, where Steam plays its own trackpad haptics on the Deck.
-- **Stick deadzone**
+- **Check for updates** Since the extension is not live on decky store yet, 
+  this is a simple way to check if there is an update, to make sure you have the latest features.
 
 ## Known limitations
 

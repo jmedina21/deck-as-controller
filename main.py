@@ -12,7 +12,7 @@ import signal
 import decky
 
 SYSTEM_PYTHON = "/usr/bin/python3"
-DEFAULT_OPTIONS = {"screen_off": True, "deadzone": 0.02, "pad_haptics": True, "profile": "dualsense_edge",
+DEFAULT_OPTIONS = {"screen_off": True, "pad_haptics": True, "profile": "dualsense_edge",
                    "connection": "bluetooth"}
 # Options that change the daemon's identity or transport; changing them restarts it.
 RESTART_OPTIONS = ("profile", "connection")
@@ -83,6 +83,14 @@ class Plugin:
         await self._restore()
 
     # ---- frontend API -----------------------------------------------------
+
+    async def get_version(self) -> str:
+        """The installed plugin's version (from its package.json)."""
+        try:
+            with open(os.path.join(decky.DECKY_PLUGIN_DIR, "package.json")) as f:
+                return json.load(f).get("version", "")
+        except (OSError, ValueError):
+            return ""
 
     async def get_state(self) -> dict:
         self.state = {**self.state, "usb": await self._drd("status")}

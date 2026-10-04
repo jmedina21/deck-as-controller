@@ -14,8 +14,8 @@ over Bluetooth Classic like the other controller types.
 import struct
 import time
 
-from ..deck import (HAPTIC_SCRIPT, HAPTIC_SWEEP, HAPTIC_TONE, DeckInput, haptic_cmd,
-                    haptic_pulse_cmd)
+from ..deck import (HAPTIC_INSANE, HAPTIC_LONG, HAPTIC_MEDIUM, HAPTIC_SCRIPT, HAPTIC_SHORT,
+                    HAPTIC_SWEEP, HAPTIC_TONE, DeckInput, haptic_cmd, haptic_pulse_cmd)
 from .base import Battery, Encoder, Profile, stick_unit
 
 REPORT_STATE = 0x45  # 45 bytes after the ID: state without the orientation quaternion
@@ -56,6 +56,17 @@ RUMBLE_TIMEOUT = 0.5
 # grip motors (3 left, 4 right, 5 both); the Deck only has the trackpads.
 _PULSE_PADS = {0: 0, 1: 1, 2: 2, 3: 1, 4: 0, 5: 2}  # pulse: 0 right, 1 left, 2 both
 _PADS = {0: 0, 1: 1, 2: 2, 3: 0, 4: 1, 5: 2}  # the others: 0 left, 1 right, 2 both
+
+
+def _click_intensity(gain_db: int) -> int:
+    """Steam sets how strong a tick is with a gain here: -9 dB for low and -3 dB
+    for high haptic intensity. On the Deck it sends an intensity level instead
+    (HAPTIC_SHORT for low, HAPTIC_LONG for high) with no gain."""
+    if gain_db <= -8:
+        return HAPTIC_SHORT
+    if gain_db <= -5:
+        return HAPTIC_MEDIUM
+    return HAPTIC_LONG if gain_db <= 0 else HAPTIC_INSANE
 
 _BUTTONS = {
     "a": 0x00000001, "b": 0x00000002, "x": 0x00000004, "y": 0x00000008,
@@ -128,9 +139,6 @@ class SteamController(Profile):
     service_name = "Steam Controller"
     provider = "Valve"
     descriptor = DESCRIPTOR
-    # Pass on every report of the Deck's controller (one per 4 ms), so trackpads
-    # and gyro are as smooth as on the Deck itself.
-    report_interval = 0.003
     host_haptics = True
 
     def __init__(self):
@@ -188,7 +196,8 @@ class SteamController(Profile):
         if report == OUT_PULSE and len(msg) >= 9:  # a2 81 <side> <on: u16> <off: u16> <count: u16>
             return haptic_pulse_cmd(_PULSE_PADS.get(msg[2], 2), *struct.unpack_from("<HHH", msg, 3))
         if report == OUT_COMMAND:  # a2 82 <side> <0 stop, 1 click, 2 strong click> <gain: dB>
-            return haptic_cmd(pad, min(msg[3], 2), struct.unpack_from("<b", msg, 4)[0])
+            gain = struct.unpack_from("<b", msg, 4)[0]
+            return haptic_cmd(pad, min(msg[3], 2), intensity=_click_intensity(gain))
         if report == OUT_LFO_TONE and len(msg) >= 11:
             # a2 83 <side> <gain> <Hz: u16> <ms: u16> <lfo Hz: u16> <lfo depth>
             gain, freq, duration_ms, lfo_freq, lfo_depth = struct.unpack_from("<bHHHB", msg, 3)

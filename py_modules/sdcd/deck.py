@@ -112,9 +112,15 @@ class DeckInput:
 
 
 DIGITAL = [f.name for f in fields(DeckInput) if f.type is bool]
+# Trackpad touches are not latched: a lifted finger has no position, so a touch
+# kept on after the finger left would be reported at the centre of the pad.
+LATCHED = [n for n in DIGITAL if n not in ("lpad_touch", "rpad_touch")]
 
 HAPTIC_OFF, HAPTIC_TICK, HAPTIC_CLICK, HAPTIC_TONE = 0, 1, 2, 3
 HAPTIC_SCRIPT, HAPTIC_SWEEP = 6, 7
+# Strength of a tick or click. Steam on the Deck sends these for its low, medium
+# and high haptic intensity settings, with a gain of 0.
+HAPTIC_SHORT, HAPTIC_MEDIUM, HAPTIC_LONG, HAPTIC_INSANE = 1, 2, 3, 4
 
 
 def haptic_pulse_cmd(pad: int, on_us: int, off_us: int, count: int) -> bytes:
@@ -127,14 +133,17 @@ def haptic_pulse_cmd(pad: int, on_us: int, off_us: int, count: int) -> bytes:
 
 def haptic_cmd(pad: int, kind: int, gain_db: int = 0, freq: int = 0, duration_ms: int = 0,
                lfo_freq: int = 0, lfo_depth: int = 0, script: int = 0,
-               sweep_start: int = 0, sweep_end: int = 0) -> bytes:
+               sweep_start: int = 0, sweep_end: int = 0, intensity: int = 0) -> bytes:
     """Feature command for the trackpad haptics' effects (HAPTIC_*), as Steam sends on the Deck.
 
     Here pad is 0 = left, 1 = right, 2 = both. gain_db is clamped to -24..6.
+    intensity is HAPTIC_SHORT..HAPTIC_INSANE, or 0 for the controller's default.
     """
-    body = struct.pack("<BBBbHhHHBBBHH", pad, kind, 0, max(-24, min(6, gain_db)), freq,
+    body = struct.pack("<BBBbHhHHBBBHH", pad, kind, intensity, max(-24, min(6, gain_db)), freq,
                        min(0x7FFF, duration_ms), 0, lfo_freq, lfo_depth, 0, script,
                        sweep_start, sweep_end)
+    if not (script or sweep_start or sweep_end):
+        body = body[:13]  # the length Steam uses: everything up to the LFO depth
     return bytes([ID_TRIGGER_HAPTIC_CMD, len(body)]) + body
 
 
@@ -148,7 +157,7 @@ class SharedInput:
     """Latest Deck state shared between the USB reader and the Bluetooth sender.
 
     Presses are latched until sent, so a tap shorter than a report interval
-    still reaches the host. `urgent` marks changes other than IMU noise.
+    still reaches the host (see LATCHED). `urgent` marks changes other than IMU noise.
     """
 
     def __init__(self):
@@ -165,7 +174,7 @@ class SharedInput:
             if (prev is None or pressed != {n for n in DIGITAL if getattr(prev, n)}
                     or _analog_key(s) != _analog_key(prev)):
                 self.urgent = True
-            self.latched |= pressed
+            self.latched |= pressed.intersection(LATCHED)
 
     def take(self) -> DeckInput | None:
         with self.lock:
@@ -173,7 +182,7 @@ class SharedInput:
             if s is None:
                 return None
             out = replace(s, **{n: True for n in self.latched})
-            self.latched = {n for n in DIGITAL if getattr(s, n)}
+            self.latched = {n for n in LATCHED if getattr(s, n)}
             self.urgent = False
             return out
 

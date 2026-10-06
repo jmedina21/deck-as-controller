@@ -1,47 +1,47 @@
 name: Build release zip
 
 on:
-  workflow_dispatch:
-    inputs:
-      publish:
-        description: "Also publish a GitHub release (tag v<package.json version>)"
-        type: boolean
-        default: false
+    workflow_dispatch:
+        inputs:
+            publish:
+                description: "Also publish a GitHub release (tag v<package.json version>)"
+                type: boolean
+                default: false
 
 permissions:
-  contents: write
+    contents: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+            - run: pnpm install --frozen-lockfile
 
-      - name: Build zip
-        run: scripts/package.sh
+            - name: Build zip
+              run: scripts/package.sh
 
-      - name: Read version
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+            - name: Read version
+              id: version
+              run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: deck-as-controller-${{ steps.version.outputs.version }}
-          path: out/deck-as-controller.zip
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: deck-as-controller-${{ steps.version.outputs.version }}
+                  path: out/deck-as-controller.zip
 
-      - name: Publish release
-        if: inputs.publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "v${{ steps.version.outputs.version }}" out/deck-as-controller.zip \
-            --title "v${{ steps.version.outputs.version }}" --generate-notes
+            - name: Publish release
+              if: inputs.publish
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  gh release create "v${{ steps.version.outputs.version }}" out/deck-as-controller.zip \
+                    --title "v${{ steps.version.outputs.version }}" --generate-notes

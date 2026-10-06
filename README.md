@@ -33,22 +33,28 @@ See [Tested devices](#tested-devices) for what others have tried.
 
 ## Requested Features (under development/research, not all will happen)
 - Use of the Steamdeck's screen as a secondary screen, (think WiiU, 3ds, guides, etc)
-- Nintendo Switch Controller Profile
+- Nintendo Switch Controller, Xbox 360, PS4 and PS3 Profile
+- BLE connection
+
 
 ## Install
 
 1. Install [Decky Loader](https://decky.xyz) on your Deck.
-2. Download `deck-as-controller.zip` from the releases page.
-3. In Game Mode, open **⋯ → Decky → ⚙ Settings → General**, turn on **Developer mode**, then go
+2. Download `deck-as-controller.zip` from the [releases page](https://github.com/jmedina21/deck-as-controller/releases).
+3. Do not download the source code or any other file, you just need `deck-as-controller.zip`
+4. In Game Mode, open **⋯ → Decky → ⚙ Settings → General**, turn on **Developer mode**, then go
    to **Developer → Install Plugin from ZIP File** and pick the zip.
 
 ## Use
 
+1. First make sure you forget the connection between the steamdeck and the device you will be connecting,
+  if the devices have the connection saved the controller won't work.
 1. Open **⋯ → Decky → Deck as Controller**, choose a **controller type**, and turn on
    **Use as controller**. **Connect with** is **Wireless (Bluetooth)** by default; for a cable,
    see [Wired (USB)](#wired-usb).
-2. The first time, the Deck is ready to pair. On your Mac or iPad, open Bluetooth settings and
-   connect to the controller that appears (e.g. "DualSense Edge Wireless Controller").
+2. The first time, the Deck is ready to pair. On your Device(Mac, Windows, Linux computer, also works on Ipad and iphone),
+   open Bluetooth settings and connect to the controller that appears (e.g. "DualSense Edge Wireless Controller") it can 
+   take from 30 seconds to 1 minutes to show.
 3. After that, turning the plugin on reconnects to the device automatically.
 
 While connected, the Deck's controls go to your device:

@@ -297,10 +297,13 @@ class Daemon:
         """Hosts connecting to us: first pairing, or a host that reconnects itself."""
         ctrl_srv, intr_srv = hid.listen(hid.PSM_CTRL), hid.listen(hid.PSM_INTR)
         while not self.stopping.is_set():
-            ctrl, (address, _) = ctrl_srv.accept()
+            # Python 3.14+ adds cid/bdaddr_type to L2CAP addresses; only the bdaddr matters
+            ctrl, address = ctrl_srv.accept()
+            address = address[0]
             intr_srv.settimeout(10)
             try:
-                intr, (address2, _) = intr_srv.accept()
+                intr, address2 = intr_srv.accept()
+                address2 = address2[0]
             except socket.timeout:
                 ctrl.close()
                 continue

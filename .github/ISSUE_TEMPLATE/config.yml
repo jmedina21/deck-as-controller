@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the README first
+    url: https://github.com/jmedina21/deck-as-controller#readme
+    about: Setup steps, which controller type to pick, and known limitations.

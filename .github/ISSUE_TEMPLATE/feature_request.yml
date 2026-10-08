@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a new feature or controller type.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [Requested Features](https://github.com/jmedina21/deck-as-controller#requested-features-under-developmentresearch-not-all-will-happen) list in the README first; if it's there, add a 👍 to the existing issue instead.
+
+  - type: textarea
+    id: feature
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Why do you need it?
+      description: The device, game or situation you'd use it for.
+    validations:
+      required: true

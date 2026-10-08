@@ -1,0 +1,67 @@
+name: Device test report
+description: Tell us how the plugin works (or doesn't) on a device that isn't in the Tested devices table.
+labels: ["device report"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Results get added to the [Tested devices](https://github.com/jmedina21/deck-as-controller#tested-devices) table. If something is broken, please open a **Bug report** instead so it gets the log.
+
+    - type: input
+      id: plugin-version
+      attributes:
+          label: Plugin version
+          placeholder: e.g. 0.5.1
+      validations:
+          required: true
+
+    - type: dropdown
+      id: deck-model
+      attributes:
+          label: Steam Deck model
+          options:
+              - OLED
+              - LCD
+      validations:
+          required: true
+
+    - type: input
+      id: host
+      attributes:
+          label: Device you connected to
+          description: The device, its OS and version.
+          placeholder: e.g. Pixel 8, Android 15 / Windows 11 PC
+      validations:
+          required: true
+
+    - type: dropdown
+      id: controller-types
+      attributes:
+          label: Controller types tested
+          multiple: true
+          options:
+              - PS5 (DualSense)
+              - PS5 Edge
+              - Xbox Elite Series 2
+              - Steam Controller
+      validations:
+          required: true
+
+    - type: dropdown
+      id: connection
+      attributes:
+          label: Connection
+          multiple: true
+          options:
+              - Wireless (Bluetooth)
+              - Wired (USB cable)
+      validations:
+          required: true
+
+    - type: textarea
+      id: results
+      attributes:
+          label: Results
+          description: What works and what doesn't (buttons, sticks, trackpads, gyro, rumble, back buttons), and which games or apps you tried.
+      validations:
+          required: true

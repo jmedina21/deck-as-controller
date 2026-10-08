@@ -1,0 +1,117 @@
+name: Bug report
+description: Something doesn't work, disconnects, or behaves wrong.
+labels: ["bug"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for reporting! The plugin depends a lot on the Deck model, the device you connect to and the controller type, so please fill in every field. Issues without these details are hard to fix and may be closed.
+
+              Before opening, check the [Known limitations](https://github.com/jmedina21/deck-as-controller#known-limitations) in the README; your problem may already be listed there.
+
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Before you report
+          options:
+              - label: I'm on the latest release (use **Check for updates** in the plugin).
+                required: true
+              - label: I removed the old pairing on **both** the Deck and my device, then paired again.
+                required: true
+              - label: I searched existing issues and this isn't already reported.
+                required: true
+
+    - type: input
+      id: plugin-version
+      attributes:
+          label: Plugin version
+          description: Shown under **Version** in the plugin panel.
+          placeholder: e.g. 0.5.1
+      validations:
+          required: true
+
+    - type: dropdown
+      id: deck-model
+      attributes:
+          label: Steam Deck model
+          options:
+              - OLED
+              - LCD
+      validations:
+          required: true
+
+    - type: input
+      id: steamos
+      attributes:
+          label: SteamOS and Decky Loader versions
+          description: SteamOS is in **Settings → System**; Decky Loader in **Decky → ⚙ Settings**.
+          placeholder: e.g. SteamOS 3.8.28, Decky Loader 3.2.9
+      validations:
+          required: true
+
+    - type: input
+      id: host
+      attributes:
+          label: Device you connected to
+          description: The device, its OS and version, and whether you used Steam or a native game/app.
+          placeholder: e.g. MacBook Air M2, macOS 27.1, Steam / Windows 11 PC, Hollow Knight
+      validations:
+          required: true
+
+    - type: dropdown
+      id: controller-type
+      attributes:
+          label: Controller type
+          options:
+              - PS5 (DualSense)
+              - PS5 Edge
+              - Xbox Elite Series 2
+              - Steam Controller
+      validations:
+          required: true
+
+    - type: dropdown
+      id: connection
+      attributes:
+          label: Connection
+          options:
+              - Wireless (Bluetooth)
+              - Wired (USB cable)
+      validations:
+          required: true
+
+    - type: textarea
+      id: what-happened
+      attributes:
+          label: What happened?
+          description: |
+              What went wrong. "It doesn't work" isn't enough: does the controller not show up, fail to pair, connect then drop, lag, have wrong buttons?
+      validations:
+          required: true
+
+    - type: textarea
+      id: steps
+      attributes:
+          label: Steps to reproduce
+          placeholder: |
+              1. Choose PS5 Edge, turn on Use as controller
+              2. Open Bluetooth settings on the Mac and connect
+              3. ...
+      validations:
+          required: true
+
+    - type: textarea
+      id: logs
+      attributes:
+          label: Plugin log
+          description: |
+              Reproduce the problem, then copy the newest file from `~/homebrew/logs/deck-as-controller/` on the Deck (Desktop Mode → Dolphin, or over SSH). Paste it here or drag the file into this box.
+          render: text
+      validations:
+          required: false
+
+    - type: textarea
+      id: extra
+      attributes:
+          label: Anything else?
+          description: Screenshots, videos, other devices you tried, whether it ever worked before.

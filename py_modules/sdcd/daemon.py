@@ -28,6 +28,8 @@ from gi.repository import GLib
 from . import bluez, hid, usb
 from .deck import DeckController, DeckInput, SharedInput, rebind_all
 from .profiles import DEFAULT_PROFILE, Battery, Encoder, get_profile, profile_list
+from .profiles.steam import SteamController
+from .lizard import LizardRelay
 
 log = logging.getLogger("sdcd")
 
@@ -388,6 +390,8 @@ class Daemon:
             self.session_thread.start()
 
     def _session(self, link: hid.Link | usb.Link, deck: DeckController, latest: SharedInput):
+        relay = (LizardRelay(deck, link, self.profile)
+                 if not self.usb and isinstance(self.profile, SteamController) else None)
         if self.usb:
             name = "your computer (USB)"
         else:
@@ -399,7 +403,7 @@ class Daemon:
         self.link_name = name
         log.info("connected to %s (%s) as %s", name, link.address, self.profile.id)
         try:
-            deck.grab()
+            deck.grab(native_lizard=relay is not None)
         except Exception as e:
             log.exception("could not grab the Deck controller")
             self.emit(type="error", message=f"Could not take over the Deck controller: {e}")
@@ -407,13 +411,18 @@ class Daemon:
         else:
             self.screen_off = self.options["screen_off"]
             self.emit_state()
-            threading.Thread(target=self._read_deck, args=(link, deck, latest), daemon=True,
+            if relay:
+                relay.start()
+            threading.Thread(target=self._read_deck, args=(link, deck, latest, relay), daemon=True,
                              name="deck-reader").start()
             self.stats_since = time.monotonic()
             for report in self.profile.side_reports(self.battery):
                 link.send_extra(report)
             link.run()
         finally:
+            link.close()
+            if relay:
+                relay.stop()
             deck.release()
             self.screen_off = False
             with self.link_lock:
@@ -430,7 +439,8 @@ class Daemon:
                 self.auto_reconnect = False
             self.emit_state()
 
-    def _read_deck(self, link: hid.Link | usb.Link, deck: DeckController, latest: SharedInput):
+    def _read_deck(self, link: hid.Link | usb.Link, deck: DeckController, latest: SharedInput,
+                   relay: LizardRelay | None = None):
         qam_down_at = None
         qam_ours = True  # the current ⋯ press is for the plugin, not for the host
         last_config = time.monotonic()
@@ -443,6 +453,13 @@ class Daemon:
                 link.close()
                 return
             now = time.monotonic()
+            if relay:
+                try:
+                    relay.sync()
+                except OSError:
+                    log.exception("could not switch native fallback mode")
+                    link.close()
+                    return
             if now - last_config > 5:  # re-assert settings in case the controller reset
                 _safe(deck.configure)
                 last_config = now

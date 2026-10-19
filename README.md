@@ -125,7 +125,12 @@ trackpads as separate pads, the four back buttons, gyro and stick touch, and you
 with Steam Input like a real one. Rumble and trackpad haptics come from Steam. Games that don't
 run through Steam won't recognize it: on a Mac that includes native games like Hollow Knight and
 Silksong, because macOS has no support for the Steam Controller and Steam can't pass it on to
-them. Tested with Steam on a Mac and on a Linux PC.
+them. Tested with Steam on a Mac and on Linux and Windows PCs.
+
+Like a real one, it falls back to mouse and keyboard (Lizard Mode) when Steam can't drive a window
+itself, such as a Windows desktop context menu or an admin prompt. The Deck's own built-in mouse
+and keyboard mode, the one it uses before Steam starts, is passed on to your device until Steam
+takes over again.
 
 ### Button mapping
 
@@ -203,6 +208,7 @@ Reports from the developer and from users. Something missing or different for yo
 | LCD  | Linux PC (NixOS)             | PS5 Edge              | ✅ Works, including trackpads and back buttons. Remove any old pairing on both sides first. | [#4](https://github.com/jmedina21/deck-as-controller/issues/4)                                           |
 | –    | Linux PC (CachyOS), Steam    | Steam Controller      | ✅ Works                                                                                    | [@SrStylus](https://github.com/SrStylus), [#2](https://github.com/jmedina21/deck-as-controller/issues/2) |
 | LCD  | Windows 11                   | Steam Controller      | ✅ Works                                                                                    | @SrStylus, [#20](https://github.com/jmedina21/deck-as-controller/issues/20)                              |
+| OLED | Windows 11, Steam            | Steam Controller      | ✅ Works, including desktop context menus and UAC prompts (Lizard Mode)                     | [@Nemec163](https://github.com/Nemec163)                                                                 |
 
 ## How it works
 

@@ -11,6 +11,7 @@ written with SET_REPORT and its reply is read back with GET_REPORT.
 The real controller is a Bluetooth LE device; here the same reports are served
 over Bluetooth Classic like the other controller types.
 """
+import logging
 import struct
 import time
 
@@ -22,17 +23,34 @@ REPORT_STATE = 0x45  # 45 bytes after the ID: state without the orientation quat
 REPORT_BATTERY = 0x43
 REPORT_FEATURE = 0x01
 FEATURE_LEN = 63  # after the ID
+REPORT_MOUSE, REPORT_KEYBOARD = 0x40, 0x41
+
+log = logging.getLogger("sdcd.steam")
 
 OUT_RUMBLE, OUT_PULSE, OUT_COMMAND = 0x80, 0x81, 0x82
 OUT_LFO_TONE, OUT_LOG_SWEEP, OUT_SCRIPT = 0x83, 0x84, 0x85
 
 # Feature commands (the same family the Deck's own controller uses, see deck.py)
 ID_GET_ATTRIBUTES_VALUES = 0x83
+ID_CLEAR_DIGITAL_MAPPINGS = 0x81
+ID_SET_DEFAULT_DIGITAL_MAPPINGS = 0x85
+ID_LOAD_DEFAULT_SETTINGS = 0x8E
 ID_SET_SETTINGS_VALUES = 0x87
 ID_GET_SETTINGS_VALUES = 0x89
 ID_TRIGGER_HAPTIC_PULSE = 0x8F
 ID_GET_STRING_ATTRIBUTE = 0xAE
 ID_TRIGGER_RUMBLE_CMD = 0xEB
+SETTING_LIZARD_MODE = 9
+
+# Lizard Mode collections, verbatim from the real controller's descriptor: the
+# Deck's own USB mouse/keyboard (interfaces 0 and 1) with the report ID inside
+# each collection. Their reports are relayed unchanged; see lizard.py.
+MOUSE_DESCRIPTOR = bytes.fromhex(
+    "05010902a10185400901a100050919012902150025017501950281027506950181010501"
+    "093009311581257f750895028106950109388106050c0a380295018106c0c0")
+KEYBOARD_DESCRIPTOR = bytes.fromhex(
+    "05010906a1018541050719e029e71500250175019508810281011900296515002565"
+    "750895068100c0")
 
 # (tag, value) pairs for GET_ATTRIBUTES_VALUES, as a real controller answers.
 # The firmware build time is far in the future so Steam never offers to update
@@ -86,9 +104,11 @@ def _reports(item: int, *reports: tuple[int, int]) -> bytes:
     return b"".join(bytes([0x85, rid, 0x09, 0x01, 0x95, length, item, 0x02]) for rid, length in reports)
 
 
-# One vendor-defined collection of byte arrays, like the real controller's.
+# Mouse and keyboard first, then one vendor-defined collection of byte arrays,
+# in the real controller's order, which Windows accepts over Bluetooth.
 DESCRIPTOR = (
-    bytes([0x06, 0x00, 0xFF, 0x09, 0x01, 0xA1, 0x01, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08])
+    MOUSE_DESCRIPTOR + KEYBOARD_DESCRIPTOR
+    + bytes([0x06, 0x00, 0xFF, 0x09, 0x01, 0xA1, 0x01, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x75, 0x08])
     # Input: state with quaternion, battery, state, state with pad timestamp, wireless status
     + _reports(0x81, (0x42, 53), (REPORT_BATTERY, 14), (REPORT_STATE, 45), (0x47, 45), (0x79, 1))
     # Output: rumble, pulse, command, tone, sweep, script, haptic audio stream
@@ -145,20 +165,35 @@ class SteamController(Profile):
     def __init__(self):
         self.command = bytes(2)  # last feature command from the host, without the report ID
         self.settings: dict[int, int] = {}
+        self.lizard_mode = True
 
     def new_encoder(self) -> Encoder:
+        self._set_lizard(True)
         return SteamEncoder()
+
+    def _set_lizard(self, enabled: bool):
+        if self.lizard_mode != enabled:
+            log.info("native lizard mode: %s", "on" if enabled else "off")
+        self.lizard_mode = enabled
+        self.settings[SETTING_LIZARD_MODE] = int(enabled)
 
     def set_feature(self, report: bytes):
         if len(report) < 3 or report[0] != REPORT_FEATURE:
             return
         self.command = bytes(report[1:])
-        if self.command[0] == ID_SET_SETTINGS_VALUES:
-            # <register> <value: u16>, repeated. Nothing to apply: the daemon
-            # already runs the Deck's controller the way Steam asks for here.
+        cmd = self.command[0]
+        if cmd == ID_CLEAR_DIGITAL_MAPPINGS:
+            self._set_lizard(False)
+        elif cmd in (ID_SET_DEFAULT_DIGITAL_MAPPINGS, ID_LOAD_DEFAULT_SETTINGS):
+            self._set_lizard(True)
+        elif cmd == ID_SET_SETTINGS_VALUES:
             values = self.command[2:2 + self.command[1]]
-            for i in range(0, len(values) - 2, 3):
+            if len(values) != self.command[1] or len(values) % 3:
+                return
+            for i in range(0, len(values), 3):
                 self.settings[values[i]] = values[i + 1] | values[i + 2] << 8
+                if values[i] == SETTING_LIZARD_MODE and self.settings[values[i]] in (0, 1):
+                    self._set_lizard(bool(self.settings[values[i]]))
 
     def feature_report(self, report_id: int, mac: bytes) -> bytes | None:
         if report_id != REPORT_FEATURE:

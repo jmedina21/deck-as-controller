@@ -25,6 +25,8 @@ USBDEVFS_RELEASEINTERFACE = 0x80045510
 
 # Feature commands and settings registers (see linux drivers/hid/hid-steam.c)
 ID_CLEAR_DIGITAL_MAPPINGS = 0x81
+ID_SET_DEFAULT_DIGITAL_MAPPINGS = 0x85
+ID_LOAD_DEFAULT_SETTINGS = 0x8E
 ID_SET_SETTINGS_VALUES = 0x87
 ID_TRIGGER_RUMBLE_CMD = 0xEB
 ID_TRIGGER_HAPTIC_PULSE = 0x8F
@@ -226,12 +228,14 @@ class DeckController:
         self.fd = None
         self.dev = None
         self.lock = threading.Lock()  # serializes control transfers
+        self.claimed: list[int] = []
+        self.lizard_mode = False
         self.rumble_wanted = (0, 0)
         self.rumble_applied = (0, 0)
         self.rumble_until: float | None = None  # monotonic time a timed rumble ends
         self.rumble_event = threading.Event()
 
-    def grab(self):
+    def grab(self, native_lizard: bool = False):
         self.dev = find_device()
         if not self.dev:
             raise RuntimeError("Steam Deck controller not found")
@@ -245,7 +249,9 @@ class DeckController:
         devnum = int(open(f"{self.dev}/devnum").read())
         try:
             self.fd = os.open(f"/dev/bus/usb/{bus:03d}/{devnum:03d}", os.O_RDWR)
-            fcntl.ioctl(self.fd, USBDEVFS_CLAIMINTERFACE, struct.pack("I", GAMEPAD_IFACE))
+            for interface in (HID_INTERFACES if native_lizard else (GAMEPAD_IFACE,)):
+                fcntl.ioctl(self.fd, USBDEVFS_CLAIMINTERFACE, struct.pack("I", interface))
+                self.claimed.append(interface)
             self.configure()
             threading.Thread(target=self._rumble_loop, daemon=True, name="deck-rumble").start()
         except Exception:
@@ -253,11 +259,20 @@ class DeckController:
             raise
 
     def configure(self):
-        """Turn off keyboard/mouse emulation and the Steam watchdog; enable raw IMU."""
-        self._feature(bytes([ID_CLEAR_DIGITAL_MAPPINGS]))
-        self._settings((SETTING_LIZARD_MODE, 0),
+        """Keep native fallback in the requested mode; always retain raw IMU."""
+        self._feature(bytes([ID_SET_DEFAULT_DIGITAL_MAPPINGS if self.lizard_mode
+                             else ID_CLEAR_DIGITAL_MAPPINGS]))
+        self._settings((SETTING_LIZARD_MODE, int(self.lizard_mode)),
                        (SETTING_STEAM_WATCHDOG_ENABLE, 0),
                        (SETTING_IMU_MODE, IMU_SEND_RAW_ACCEL_GYRO))
+
+    def set_lizard(self, enabled: bool):
+        if enabled == self.lizard_mode:
+            return
+        self.lizard_mode = enabled
+        if enabled:
+            self._feature(bytes([ID_LOAD_DEFAULT_SETTINGS]))
+        self.configure()
 
     def release(self):
         if self.fd is not None:
@@ -265,19 +280,24 @@ class DeckController:
                 self._send_rumble(0, 0)
             except OSError:
                 pass
-            try:
-                fcntl.ioctl(self.fd, USBDEVFS_RELEASEINTERFACE, struct.pack("I", GAMEPAD_IFACE))
-            except OSError:
-                pass
+            for interface in reversed(self.claimed):
+                try:
+                    fcntl.ioctl(self.fd, USBDEVFS_RELEASEINTERFACE, struct.pack("I", interface))
+                except OSError:
+                    pass
             os.close(self.fd)
             self.fd = None
+            self.claimed.clear()
         rebind_all()
 
     def read(self, timeout_ms: int = 100) -> bytes | None:
         """One raw 64-byte report, or None on timeout. Raises OSError if the device is gone."""
-        data = bytearray(64)
-        buf = (ctypes.c_uint8 * 64).from_buffer(data)
-        arg = bytearray(struct.pack("III4xQ", GAMEPAD_EP, 64, timeout_ms, ctypes.addressof(buf)))
+        return self.read_endpoint(GAMEPAD_EP, 64, timeout_ms)
+
+    def read_endpoint(self, endpoint: int, size: int, timeout_ms: int = 20) -> bytes | None:
+        data = bytearray(size)
+        buf = (ctypes.c_uint8 * size).from_buffer(data)
+        arg = bytearray(struct.pack("III4xQ", endpoint, size, timeout_ms, ctypes.addressof(buf)))
         try:
             n = fcntl.ioctl(self.fd, USBDEVFS_BULK, arg)
         except OSError as e:

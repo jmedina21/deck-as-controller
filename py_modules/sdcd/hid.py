@@ -232,6 +232,18 @@ class Link:
         except (OSError, ValueError):
             pass
 
+    def send_native(self, report: bytes):
+        """Native button releases must survive a temporarily full Bluetooth socket."""
+        while self.alive.is_set():
+            try:
+                self.intr.send(b"\xA1" + report, socket.MSG_DONTWAIT)
+                return
+            except BlockingIOError:
+                time.sleep(0.001)
+            except (OSError, ValueError):
+                self.close()
+                return
+
     def _interrupt_rx(self):
         try:
             while self.alive.is_set():

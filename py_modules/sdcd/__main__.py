@@ -31,5 +31,15 @@ elif args.drd:
         status = {**usb.drd_status(), "error": str(e)}
     print(json.dumps(status))
 else:
-    from .daemon import Daemon
+    try:
+        from .daemon import Daemon
+    except ModuleNotFoundError as e:
+        if e.name not in ("dbus", "gi"):
+            raise
+        # SteamOS ships these bindings; some other distros (e.g. CachyOS) don't.
+        print(json.dumps({"type": "stopped", "reason":
+                          f"error: the system Python is missing the '{e.name}' module. "
+                          "Install the D-Bus and GObject bindings for Python, e.g. on CachyOS "
+                          "or Arch: sudo pacman -S python-dbus python-gobject"}))
+        sys.exit(1)
     Daemon(args.settings_dir, json.loads(args.options)).run()

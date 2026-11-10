@@ -158,6 +158,11 @@ L5 / R5, both trackpads); only **⋯** stays reserved for the plugin, unless you
 
 ## Known limitations
 
+- **Distros other than SteamOS may need two Python packages.** The plugin uses the system
+  Python's D-Bus and GObject bindings, which SteamOS ships but some distros don't install by
+  default. If the plugin reports a missing `dbus` or `gi` module (e.g. on CachyOS Deckify), run
+  `sudo pacman -S python-dbus python-gobject` and try again.
+
 - **Steam doesn't rumble the PS5 types.** Steam never sends rumble to them over Bluetooth, so
   Steam's rumble test and games that rumble through Steam Input stay silent. Use Xbox Elite if
   you need rumble in those.

@@ -162,7 +162,17 @@ L5 / R5, both trackpads); only **⋯** stays reserved for the plugin, unless you
   Python's D-Bus and GObject bindings, which SteamOS ships but some distros don't install by
   default. If the plugin reports a missing `dbus` or `gi` module (e.g. on CachyOS Deckify), run
   `sudo pacman -S python-dbus python-gobject` and try again.
-
+- **Steam on a Linux PC needs its udev rules to see the Deck.** Steam reads controllers through
+  `/dev/hidraw*`, which only root can open unless Steam's udev rules are installed. Some
+  installs, such as Flatpak Steam or Steam on Arch, may not have them. The Deck then pairs but
+  Steam ignores it: the Steam Controller type does nothing, and the PS5 types only work as a
+  plain gamepad outside Steam. Check with `ls /usr/lib/udev/rules.d/ /etc/udev/rules.d/ | grep -i steam`.
+  If nothing shows up, install Valve's rules, then reconnect the Deck and restart Steam
+  ([#39](https://github.com/jmedina21/deck-as-controller/issues/39)):
+  ```
+  sudo curl -o /etc/udev/rules.d/60-steam-input.rules https://raw.githubusercontent.com/ValveSoftware/steam-devices/master/60-steam-input.rules
+  sudo udevadm control --reload && sudo udevadm trigger
+  ```
 - **Steam doesn't rumble the PS5 types.** Steam never sends rumble to them over Bluetooth, so
   Steam's rumble test and games that rumble through Steam Input stay silent. Use Xbox Elite if
   you need rumble in those.

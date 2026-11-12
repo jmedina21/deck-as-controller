@@ -5,10 +5,12 @@ driver and Linux hid-nintendo. Unlike the other types the host talks to the
 controller: it sends subcommands in output report 0x01 and waits for a 0x21 reply
 (device info, reads of the calibration in SPI flash, input mode, IMU on/off).
 The controller starts in simple mode (0x3F) until the host asks for full 0x30
-reports. Face buttons follow the Switch positions: Deck A (bottom) is Switch B.
+reports. Face buttons follow the Switch positions: Deck A (bottom) is Switch B,
+unless the "switch_deck_layout" option keeps the Deck's labels (Deck A is Switch A).
 """
 import struct
 from collections import deque
+from dataclasses import replace
 
 from ..deck import DeckInput
 from .base import Battery, Encoder, Profile, hat_direction, stick_unit
@@ -94,6 +96,10 @@ class SwitchProEncoder(Encoder):
         self.timer = 0
         self.full = False  # host asked for full 0x30 reports
         self.replies: deque[tuple[int, int, bytes]] = deque()  # (ack, subcommand, data)
+        self.deck_layout = False
+
+    def set_options(self, options: dict):
+        self.deck_layout = options.get("switch_deck_layout", False)
 
     def handle_output(self, msg: bytes, mac: bytes):
         # a2 01 <counter> <rumble x8> <subcommand> <args...>
@@ -117,6 +123,9 @@ class SwitchProEncoder(Encoder):
             self.replies.append((0x80, sub, b""))
 
     def encode(self, d: DeckInput | None, battery: Battery) -> bytes:
+        if d is not None and self.deck_layout:
+            # swap so the position mapping below lands each Deck button on its own label
+            d = replace(d, a=d.b, b=d.a, x=d.y, y=d.x)
         self.timer = (self.timer + 1) & 0xFF
         reply = self.replies.popleft() if self.replies else None
         if reply is None and not self.full:
@@ -196,6 +205,7 @@ class SwitchPro(Profile):
     provider = "Nintendo"
     descriptor = DESCRIPTOR
     report_interval = 0.015  # real controllers send full reports every 15 ms
+    host_sniff = True  # the switch sets 15 ms sniff right after connecting
 
     def new_encoder(self) -> Encoder:
         return SwitchProEncoder()

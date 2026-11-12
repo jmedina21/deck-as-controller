@@ -62,6 +62,16 @@ OP_WRITE_LINK_POLICY, OP_EXIT_SNIFF = 0x080D, 0x0804
 POLICY_ROLE_SWITCH_ONLY = 0x0001
 
 
+# Linux takes the link out of sniff whenever a socket sends, unless the socket says otherwise.
+SOL_BLUETOOTH, BT_POWER = 274, 9
+
+
+def allow_sniff(*socks: socket.socket):
+    """Let the host keep the link in sniff mode while we send on these sockets."""
+    for s in socks:
+        s.setsockopt(SOL_BLUETOOTH, BT_POWER, b"\x00")  # force_active off
+
+
 def keep_active(address: str, dev_id: int = 0):
     """Allow only role switches on the link to `address`, and leave sniff if already in it."""
     bdaddr = bytes.fromhex(address.replace(":", ""))[::-1]

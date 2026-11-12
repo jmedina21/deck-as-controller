@@ -6,7 +6,7 @@ Talks to the Decky plugin over stdio using JSON lines:
                    {"cmd": "connect", "address": str (optional)}
                    {"cmd": "forget", "address": str}
                    {"cmd": "options", "screen_off": bool, "pad_haptics": bool, "qam_to_host": bool,
-                    "keep_awake": bool}
+                    "keep_awake": bool, "switch_deck_layout": bool}
   stdout events:   {"type": "state", ...} | {"type": "error", "message": str}
                    {"type": "stopped", "reason": str}
 The controller type ("profile") sets the Bluetooth identity, so it's fixed for
@@ -38,7 +38,7 @@ QAM_TAP_MAX = 0.6  # seconds: tap ⋯ toggles the screen
 QAM_HOLD_STOP = 2.0  # seconds: hold ⋯ stops controller mode
 BATTERY = "/sys/class/power_supply/BAT1"
 BT_ADDRESS = "/sys/class/bluetooth/hci0/address"
-RUNTIME_OPTIONS = ("screen_off", "pad_haptics", "qam_to_host", "keep_awake")
+RUNTIME_OPTIONS = ("screen_off", "pad_haptics", "qam_to_host", "keep_awake", "switch_deck_layout")
 USB_POLL = 0.5  # seconds between checks for a computer on the USB cable
 
 
@@ -96,7 +96,8 @@ def bt_address_bytes() -> bytes:
 class Daemon:
     def __init__(self, settings_dir: str, options: dict):
         self.options = {"screen_off": True, "pad_haptics": True, "qam_to_host": False,
-                        "keep_awake": True, "profile": DEFAULT_PROFILE, "connection": "bluetooth",
+                        "keep_awake": True, "switch_deck_layout": False,
+                        "profile": DEFAULT_PROFILE, "connection": "bluetooth",
                         **options}
         self.usb = self.options["connection"] == "usb"
         self.profile = get_profile(self.options["profile"])
@@ -174,6 +175,8 @@ class Daemon:
                 self.toggle_screen()
             elif cmd == "options":
                 self.options.update({k: v for k, v in msg.items() if k in RUNTIME_OPTIONS})
+                if self.encoder:
+                    self.encoder.set_options(self.options)
                 self.emit_state()
         self.stop("plugin went away")
 
@@ -354,6 +357,7 @@ class Daemon:
                 return
             deck = DeckController()
             encoder = self.profile.new_encoder()
+            encoder.set_options(self.options)
             latest = SharedInput()
             link = usb.Link(self.usb_fd, self.profile,
                             get_report=lambda: encoder.encode(latest.take(), self.battery),
@@ -372,6 +376,7 @@ class Daemon:
                 return
             deck = DeckController()
             encoder = self.profile.new_encoder()
+            encoder.set_options(self.options)
             latest = SharedInput()
             link = hid.Link(ctrl, intr, address, self.adapter.mac_bytes, self.profile,
                             get_report=lambda: encoder.encode(latest.take(), self.battery),
@@ -383,9 +388,12 @@ class Daemon:
             self.link = link
             self.encoder = encoder
             try:
-                hid.keep_active(address)
+                if self.profile.host_sniff:
+                    hid.allow_sniff(ctrl, intr)
+                else:
+                    hid.keep_active(address)
             except OSError as e:
-                log.warning("could not block sniff mode: %s", e)
+                log.warning("could not set sniff mode: %s", e)
             self.session_thread = threading.Thread(target=self._session, args=(link, deck, latest),
                                                    daemon=True, name="session")
             self.session_thread.start()

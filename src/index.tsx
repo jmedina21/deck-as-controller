@@ -55,6 +55,7 @@ type State = {
         pad_haptics: boolean;
         qam_to_host: boolean;
         keep_awake: boolean;
+        switch_deck_layout: boolean;
         profile: string;
         connection: "bluetooth" | "usb";
     };
@@ -566,6 +567,18 @@ function Content() {
                             }
                         />
                     </PanelSectionRow>
+                    {s.options.profile === "switch_pro" && (
+                        <PanelSectionRow>
+                            <ToggleField
+                                label="Keep the Deck's A/B/X/Y"
+                                description="Each button sends its own letter instead of the one in the same spot on a Switch."
+                                checked={s.options.switch_deck_layout}
+                                onChange={async (v) =>
+                                    setState(await setOption("switch_deck_layout", v))
+                                }
+                            />
+                        </PanelSectionRow>
+                    )}
                     {hasQam && (
                         <PanelSectionRow>
                             <ToggleField

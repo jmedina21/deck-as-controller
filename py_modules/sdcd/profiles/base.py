@@ -24,6 +24,9 @@ class Encoder:
     def start_bluetooth(self):
         """This encoder is for a Bluetooth connection (not USB)."""
 
+    def set_options(self, options: dict):
+        """The plugin options, at the start and whenever one changes."""
+
 
 class Profile:
     """An emulated controller type: its Bluetooth identity and report protocol."""
@@ -44,6 +47,9 @@ class Profile:
     host_haptics: bool = False
     # The controller has a ⋯ button of its own, so the Deck's can be passed on.
     qam_button: bool = False
+    # The host puts the link in sniff mode itself and drops us if we leave it, so
+    # sniff isn't blocked for this type.
+    host_sniff: bool = False
     # Wired (USB gadget) support: the controller's USB HID descriptor, or empty if
     # this type only works over Bluetooth.
     usb_descriptor: bytes = b""
